@@ -4,9 +4,10 @@ export async function POST(request: Request) {
     try {
         const { message } = await request.json();
 
-        // Call the OpenMota Pro API at port 3001
-        // We use the internal or external IP/localhost
-        const apiRes = await fetch('http://localhost:3001/chat', {
+        const backendUrl = process.env.OPENMOTA_BACKEND_URL || 'http://localhost:3001';
+
+        // Call the OpenMota Pro API
+        const apiRes = await fetch(`${backendUrl}/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
