@@ -4,7 +4,7 @@ nixPkgs = ["nodejs_20"]
 [phases.install]
 cmds = [
   "npm ci",
-  "curl -L https://github.com/steipete/gogcli/releases/latest/download/gogcli_linux_amd64.tar.gz | tar xz -C /usr/local/bin gog",
+  "curl -L https://github.com/steipete/gogcli/releases/download/v0.11.0/gogcli_0.11.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin gog",
   "chmod +x /usr/local/bin/gog"
 ]
 
