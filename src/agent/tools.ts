@@ -198,13 +198,69 @@ const readWebpage: AgentTool = {
   }
 };
 
+// 6. Tool to manage Google Workspace (Gmail, Calendar, Drive) via gog CLI
+const googleWorkspaceManager: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'google_workspace_manager',
+      description: 'Interact with Google Workspace (Gmail, Calendar, Drive, Sheets) using gog CLI. Supports searching, reading, sending emails, and managing calendar events.',
+      parameters: {
+        type: 'object',
+        properties: {
+          subcommand: {
+            type: 'string',
+            enum: ['gmail', 'calendar', 'drive', 'sheets', 'docs', 'contacts'],
+            description: 'The Google service to interact with.'
+          },
+          action: {
+            type: 'string',
+            description: 'The specific action or command (e.g., "search", "send", "events", "list").'
+          },
+          args: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Additional arguments for the command (e.g., ["--max", "10", "newer_than:7d"]).'
+          }
+        },
+        required: ['subcommand', 'action']
+      }
+    }
+  },
+  execute: async (args: { subcommand: string, action: string, args?: string[] }) => {
+    const { subcommand, action, args: commandArgs = [] } = args;
+
+    // Construct the full command
+    const fullCommand = `gog ${subcommand} ${action} ${commandArgs.join(' ')}`;
+
+    // Safety check - specifically for gog
+    console.log(`📡 Construction Google Workspace command: ${fullCommand}`);
+
+    try {
+      // Execute with a longer timeout for network-bound operations
+      const output = execSync(fullCommand, {
+        encoding: 'utf-8',
+        timeout: 30000,
+        env: { ...process.env, GOG_NO_INPUT: 'true' }
+      });
+      return output.trim() || 'Command executed successfully.';
+    } catch (e: any) {
+      if (e.message.includes('not found') || e.message.includes('not recognized')) {
+        return "Error: The 'gog' CLI is not installed or not in the system PATH. Please ensure it is installed and configured.";
+      }
+      return `Error executing Google Workspace command: ${e.message}\nSTDOUT: ${e.stdout}\nSTDERR: ${e.stderr}`;
+    }
+  }
+};
+
 // Combine tools into a map for fast lookup and an array for the LLM
 export const availableTools: AgentTool[] = [
   getSystemInfo,
   runLocalCommand,
   listDirectory,
   webSearch,
-  readWebpage
+  readWebpage,
+  googleWorkspaceManager
 ];
 
 export const toolsSchema = availableTools.map(t => t.definition);
