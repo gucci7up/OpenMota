@@ -112,7 +112,12 @@ async function setupBot() {
 
             const execOptions = {
                 encoding: 'utf-8' as const,
-                env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR, HOME: DATA_DIR }
+                env: {
+                    ...process.env,
+                    XDG_CONFIG_HOME: GOG_CONFIG_DIR,
+                    HOME: DATA_DIR,
+                    GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD || 'openmota-secret-key'
+                }
             };
 
             // Step 0: Set credentials file
