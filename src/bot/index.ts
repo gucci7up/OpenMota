@@ -41,9 +41,23 @@ async function setupBot() {
             return ctx.reply('❌ Por favor, proporciona tu email de Google. Uso: `/gsetup1 tu@email.com`', { parse_mode: 'Markdown' });
         }
 
-        const clientSecretPath = path.join(process.cwd(), 'client_secret.json');
+        let clientSecretPath = path.join(process.cwd(), 'client_secret.json');
+
+        // Option 2 Fallback: Environment Variable
         if (!fs.existsSync(clientSecretPath)) {
-            return ctx.reply('❌ Archivo `client_secret.json` no encontrado en la raíz del proyecto. Por favor, súbelo primero.');
+            const envSecret = process.env.GOOGLE_CLIENT_SECRET_JSON;
+            if (envSecret) {
+                try {
+                    clientSecretPath = path.join(TMP_DIR, 'client_secret.json');
+                    if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+                    fs.writeFileSync(clientSecretPath, envSecret);
+                    console.log('✅ Created temporary client_secret.json from environment variable.');
+                } catch (e: any) {
+                    return ctx.reply(`❌ Error al crear archivo temporal de credenciales: ${e.message}`);
+                }
+            } else {
+                return ctx.reply('❌ No se encontró `client_secret.json` ni la variable de entorno `GOOGLE_CLIENT_SECRET_JSON`. Por favor, configura uno de los dos.');
+            }
         }
 
         // Determine gog binary path
