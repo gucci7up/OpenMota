@@ -31,6 +31,13 @@ async function setupBot() {
         ctx.reply('🧹 Memory cleared. I have forgotten our past conversations.');
     });
 
+    // Diagnostic command to check the environment running the bot
+    bot.command('envcheck', async (ctx) => {
+        const hasElevenLabs = !!config.ELEVENLABS_API_KEY || !!process.env.ELEVENLABS_API_KEY;
+        const hostName = require('os').hostname();
+        await ctx.reply(`🔍 **Env Check**\n- Host: \`${hostName}\`\n- 11Labs Key Loaded: \`${hasElevenLabs}\``, { parse_mode: 'Markdown' });
+    });
+
     // 3. Main message handler
     bot.on('message:text', async (ctx) => {
         const text = ctx.message.text;
