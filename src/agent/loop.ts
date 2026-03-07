@@ -1,6 +1,12 @@
 import { chatCompletion } from '../llm/client.js';
 import { memoryStore, Message } from '../db/index.js';
 import { toolsSchema, executeTool } from './tools.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SKILLS_DIR = path.join(__dirname, '../../data/skills');
 
 const SYSTEM_PROMPT = `You are OpenMota, a personal AI agent running locally.
 You communicate via Telegram. You can think, use tools, and you have persistent memory.
@@ -11,6 +17,32 @@ Use the tools available to you ONLY when you need to interact with the local ope
 VOICE MESSAGES: If the user asks you to speak, send a voice note, or talk, you MUST wrap your exact spoken response inside <VOICE> and </VOICE> tags. 
 For example: <VOICE>¡Hola! Me alegra hablar contigo.</VOICE>
 You can combine normal text and voice tags in the same response.`;
+
+/**
+ * Loads additional agent instructions (skills) from data/skills directory
+ */
+async function loadSkills(): Promise<string> {
+    if (!fs.existsSync(SKILLS_DIR)) return "";
+
+    try {
+        const files = fs.readdirSync(SKILLS_DIR);
+        const skillFiles = files.filter(f => f.endsWith('.md'));
+
+        let skillsContent = "";
+        for (const file of skillFiles) {
+            const content = fs.readFileSync(path.join(SKILLS_DIR, file), 'utf-8');
+            // Extract content between --- if it exists (yaml frontmatter) or just take all
+            const cleanContent = content.replace(/^---[\s\S]*?---\n?/, '').trim();
+            if (cleanContent) {
+                skillsContent += `\n\n### SKILL: ${file.replace('.md', '')}\n${cleanContent}`;
+            }
+        }
+        return skillsContent;
+    } catch (e) {
+        console.error("Error loading skills:", e);
+        return "";
+    }
+}
 
 const MAX_ITERATIONS = 5;
 
@@ -37,9 +69,13 @@ export async function runAgentLoop(userMessage: string): Promise<string> {
         // Only fetch past 30 messages to keep context window reasonable
         const history = await memoryStore.getRecentMessages(30);
 
+        // Load dynamic skills
+        const skillsContent = await loadSkills();
+        const fullSystemPrompt = SYSTEM_PROMPT + skillsContent;
+
         // Prepend System Prompt
         const messages = [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: fullSystemPrompt },
             ...history
         ];
 
