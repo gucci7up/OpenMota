@@ -11,10 +11,12 @@ import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TMP_DIR = path.join(__dirname, '../../data/tmp');
-if (!fs.existsSync(TMP_DIR)) {
-    fs.mkdirSync(TMP_DIR, { recursive: true });
-}
+const DATA_DIR = path.join(__dirname, '../../data');
+const TMP_DIR = path.join(DATA_DIR, 'tmp');
+const GOG_CONFIG_DIR = path.join(DATA_DIR, 'gog-config');
+
+if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+if (!fs.existsSync(GOG_CONFIG_DIR)) fs.mkdirSync(GOG_CONFIG_DIR, { recursive: true });
 
 // Initialize the bot
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
@@ -78,11 +80,16 @@ async function setupBot() {
         try {
             ctx.reply('⏳ Iniciando proceso de autenticación... configurando credenciales...');
 
+            const execOptions = {
+                encoding: 'utf-8' as const,
+                env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR }
+            };
+
             // Step 0: Set credentials file
-            execSync(`${gogPath} auth credentials "${clientSecretPath}"`, { encoding: 'utf-8' });
+            execSync(`${gogPath} auth credentials "${clientSecretPath}"`, execOptions);
 
             // Step 1: Start remote auth flow
-            const output = execSync(`${gogPath} auth add ${email} --remote --step 1 --services all`, { encoding: 'utf-8' });
+            const output = execSync(`${gogPath} auth add ${email} --remote --step 1 --services all`, execOptions);
 
             ctx.reply(`✅ **Paso 1 completado.**\n\nPor favor, visita el siguiente enlace, autoriza la aplicación y **copia la URL final** que te dé Google:\n\n\`${output.trim()}\`\n\nLuego, usa el comando:\n\`/gsetup2 ${email} [URL_FINAL]\``, { parse_mode: 'Markdown' });
         } catch (error: any) {
@@ -118,8 +125,13 @@ async function setupBot() {
         try {
             ctx.reply('⏳ Verificando token y finalizando autenticación...');
 
+            const execOptions = {
+                encoding: 'utf-8' as const,
+                env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR }
+            };
+
             // Step 2: Exchange code/URL for token
-            const output = execSync(`${gogPath} auth add ${email} --remote --step 2 --auth-url "${authUrl}"`, { encoding: 'utf-8' });
+            const output = execSync(`${gogPath} auth add ${email} --remote --step 2 --auth-url "${authUrl}"`, execOptions);
 
             ctx.reply(`🎉 **¡Autenticación exitosa!**\nOpenMota ahora tiene acceso a tu cuenta: **${email}**.\n\nYa puedes preguntarme por tus correos, calendario o archivos de Drive.`);
         } catch (error: any) {

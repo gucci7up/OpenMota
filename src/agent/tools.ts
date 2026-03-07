@@ -241,22 +241,30 @@ const googleWorkspaceManager: AgentTool = {
       // Linux/Dokploy logic
       const localBinPath = path.join(process.cwd(), 'bin', 'gog');
       if (fs.existsSync(localBinPath)) {
-        gogPath = `"${localBinPath}"`;
       }
     }
 
     // Construct the full command
+    const DATA_DIR = path.join(process.cwd(), 'data');
+    const GOG_CONFIG_DIR = path.join(DATA_DIR, 'gog-config');
     const fullCommand = `${gogPath} ${subcommand} ${action} ${commandArgs.join(' ')}`;
 
     // Safety check - specifically for gog
-    console.log(`📡 Constructing Google Workspace command: ${fullCommand}`);
+    console.log(`🤖 Executing Google Workspace command: ${fullCommand}`);
 
     try {
+      // Ensure the config directory exists
+      fs.mkdirSync(GOG_CONFIG_DIR, { recursive: true });
+
       // Execute with a longer timeout for network-bound operations
       const output = execSync(fullCommand, {
         encoding: 'utf-8',
         timeout: 30000,
-        env: { ...process.env, GOG_NO_INPUT: 'true' }
+        env: {
+          ...process.env,
+          GOG_NO_INPUT: 'true',
+          XDG_CONFIG_HOME: GOG_CONFIG_DIR
+        }
       });
       return output.trim() || 'Command executed successfully.';
     } catch (e: any) {
