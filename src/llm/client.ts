@@ -41,3 +41,36 @@ export const transcribeAudio = async (filePath: string) => {
         throw error;
     }
 };
+
+export const generateSpeech = async (text: string): Promise<Buffer> => {
+    if (!config.ELEVENLABS_API_KEY) {
+        throw new Error("ELEVENLABS_API_KEY is not configured.");
+    }
+
+    // Using Adam (a great predefined voice)
+    const VOICE_ID = 'pNInz6obpgDQGcFmaJgB';
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'xi-api-key': config.ELEVENLABS_API_KEY,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            text: text,
+            model_id: 'eleven_multilingual_v2', // Good for ES and EN
+            voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75
+            }
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`ElevenLabs API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+};

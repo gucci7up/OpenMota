@@ -1,9 +1,9 @@
-import { Bot } from 'grammy';
+import { Bot, InputFile } from 'grammy';
 import { config } from '../config.js';
 import { whitelistMiddleware } from './middleware.js';
 import { runAgentLoop } from '../agent/loop.js';
 import { memoryStore } from '../db/index.js';
-import { transcribeAudio } from '../llm/client.js';
+import { transcribeAudio, generateSpeech } from '../llm/client.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -43,10 +43,36 @@ async function setupBot() {
 
         try {
             // Pass the text to the agent loop
-            const response = await runAgentLoop(text);
+            let response = await runAgentLoop(text);
 
-            // Reply to the specific message
-            await ctx.reply(response, { reply_to_message_id: messageId });
+            // Handle Voice Synthesis if agent used <VOICE> tags
+            if (response.includes('<VOICE>') && response.includes('</VOICE>')) {
+                const voiceTextMatch = response.match(/<VOICE>([\s\S]*?)<\/VOICE>/);
+                if (voiceTextMatch && voiceTextMatch[1]) {
+                    const voiceText = voiceTextMatch[1].trim();
+                    console.log(`🗣️ Generating voice response: "${voiceText.substring(0, 50)}..."`);
+
+                    try {
+                        const audioBuffer = await generateSpeech(voiceText);
+                        const tempFilePath = path.join(TMP_DIR, `response_${Date.now()}.mp3`);
+                        fs.writeFileSync(tempFilePath, audioBuffer);
+
+                        await ctx.replyWithVoice(new InputFile(tempFilePath), { reply_to_message_id: messageId });
+                        fs.unlinkSync(tempFilePath);
+
+                        // Clean up response text, replace tags with indicator
+                        response = response.replace(/<VOICE>[\s\S]*?<\/VOICE>/g, '🎤 *(Enviado como nota de voz)*').trim();
+                    } catch (ttsError) {
+                        console.error('TTS Error:', ttsError);
+                        response += `\n\n*(Error generando voz: ${ttsError})*`;
+                    }
+                }
+            }
+
+            // Reply to the specific message if there's any remaining text
+            if (response.length > 0) {
+                await ctx.reply(response, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
+            }
         } catch (error: any) {
             console.error('❌ Error in message handler:', error);
 
@@ -98,10 +124,35 @@ async function setupBot() {
             ctx.replyWithChatAction('typing');
 
             // 5. Send the transcription to the Agent Loop
-            const agentResponse = await runAgentLoop(transcribedText);
+            let agentResponse = await runAgentLoop(transcribedText);
+
+            // Handle Voice Synthesis if agent used <VOICE> tags in response to the audio
+            if (agentResponse.includes('<VOICE>') && agentResponse.includes('</VOICE>')) {
+                const voiceTextMatch = agentResponse.match(/<VOICE>([\s\S]*?)<\/VOICE>/);
+                if (voiceTextMatch && voiceTextMatch[1]) {
+                    const voiceText = voiceTextMatch[1].trim();
+                    console.log(`🗣️ Generating voice response: "${voiceText.substring(0, 50)}..."`);
+
+                    try {
+                        const audioBuffer = await generateSpeech(voiceText);
+                        const tempFilePath = path.join(TMP_DIR, `audio_reply_${Date.now()}.mp3`);
+                        fs.writeFileSync(tempFilePath, audioBuffer);
+
+                        await ctx.replyWithVoice(new InputFile(tempFilePath), { reply_to_message_id: messageId });
+                        fs.unlinkSync(tempFilePath);
+
+                        agentResponse = agentResponse.replace(/<VOICE>[\s\S]*?<\/VOICE>/g, '🎤 *(Enviado como nota de voz)*').trim();
+                    } catch (ttsError) {
+                        console.error('TTS Error:', ttsError);
+                        agentResponse += `\n\n*(Error generando voz: ${ttsError})*`;
+                    }
+                }
+            }
 
             // Reply to the specific voice message
-            await ctx.reply(agentResponse, { reply_to_message_id: messageId });
+            if (agentResponse.length > 0) {
+                await ctx.reply(agentResponse, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
+            }
         } catch (error: any) {
             console.error('❌ Error handling voice message:', error);
             await ctx.reply(`Sorry, there was an error processing your audio: ${error.message}`);
