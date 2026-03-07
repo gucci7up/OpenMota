@@ -8,7 +8,7 @@ import { transcribeAudio, generateSpeech } from '../llm/client.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '../../data');
@@ -33,6 +33,36 @@ async function setupBot() {
     bot.command('clear', async (ctx) => {
         await memoryStore.clearMemory();
         ctx.reply('🧹 Memory cleared. I have forgotten our past conversations.');
+    });
+
+    bot.command('gdebug', async (ctx) => {
+        try {
+            const platform = process.platform;
+            const cwd = process.cwd();
+            const configExists = fs.existsSync(GOG_CONFIG_DIR);
+            const dataExists = fs.existsSync(DATA_DIR);
+            const gogPath = process.platform === 'win32' ? path.join(process.cwd(), 'bin', 'gog.exe') : '/app/bin/gog';
+            const gogExists = fs.existsSync(gogPath);
+
+            let gogVersion = 'Unknown';
+            if (gogExists) {
+                try {
+                    gogVersion = execSync(`${gogPath} --version`, { encoding: 'utf-8', env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR } }).trim();
+                } catch (e) { gogVersion = 'Error getting version'; }
+            }
+
+            ctx.reply(`🔍 **Bot Debug Info:**\n\n` +
+                `- **Platform:** ${platform}\n` +
+                `- **CWD:** ${cwd}\n` +
+                `- **Data Dir:** ${DATA_DIR} (${dataExists ? '✅' : '❌'})\n` +
+                `- **Config Dir:** ${GOG_CONFIG_DIR} (${configExists ? '✅' : '❌'})\n` +
+                `- **gog Path:** ${gogPath} (${gogExists ? '✅' : '❌'})\n` +
+                `- **gog Version:** ${gogVersion}\n` +
+                `- **XDG_CONFIG_HOME:** ${GOG_CONFIG_DIR}\n` +
+                `- **Time:** ${new Date().toISOString()}`, { parse_mode: 'Markdown' });
+        } catch (e: any) {
+            ctx.reply(`❌ Error in gdebug: ${e.message}`);
+        }
     });
 
     // --- Google Workspace Setup Commands ---
@@ -82,19 +112,25 @@ async function setupBot() {
 
             const execOptions = {
                 encoding: 'utf-8' as const,
-                env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR }
+                env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR, HOME: DATA_DIR }
             };
 
             // Step 0: Set credentials file
-            execSync(`${gogPath} auth credentials "${clientSecretPath}"`, execOptions);
+            // Use quotes if path has spaces, but execFileSync handles it better
+            execFileSync(gogPath.replace(/"/g, ''), ['auth', 'credentials', clientSecretPath], execOptions);
 
             // Step 1: Start remote auth flow
-            const output = execSync(`${gogPath} auth add ${email} --remote --step 1 --services all`, execOptions);
+            const output = execFileSync(gogPath.replace(/"/g, ''), ['auth', 'add', email, '--remote', '--step', '1', '--services', 'all'], execOptions);
+
+            // Check if state file was created for debugging
+            const authStatePath = path.join(GOG_CONFIG_DIR, 'gogcli/manual_auth_state.json');
+            const stateExists = fs.existsSync(authStatePath);
+            console.log(`📡 Step 1 state file exists at ${authStatePath}: ${stateExists}`);
 
             ctx.reply(`✅ **Paso 1 completado.**\n\nPor favor, visita el siguiente enlace, autoriza la aplicación y **copia la URL final** que te dé Google:\n\n\`${output.trim()}\`\n\nLuego, usa el comando:\n\`/gsetup2 ${email} [URL_FINAL]\``, { parse_mode: 'Markdown' });
         } catch (error: any) {
             console.error('Error en gsetup1:', error);
-            ctx.reply(`❌ Error: ${error.message}\n\nSTDOUT: ${error.stdout}\nSTDERR: ${error.stderr}`);
+            ctx.reply(`❌ Error en paso 1: ${error.message}\n\nSTDOUT: ${error.stdout}\nSTDERR: ${error.stderr}`);
         }
     });
 
@@ -127,16 +163,16 @@ async function setupBot() {
 
             const execOptions = {
                 encoding: 'utf-8' as const,
-                env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR }
+                env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR, HOME: DATA_DIR }
             };
 
             // Step 2: Exchange code/URL for token
-            const output = execSync(`${gogPath} auth add ${email} --remote --step 2 --auth-url "${authUrl}"`, execOptions);
+            const output = execFileSync(gogPath.replace(/"/g, ''), ['auth', 'add', email, '--remote', '--step', '2', '--auth-url', authUrl], execOptions);
 
             ctx.reply(`🎉 **¡Autenticación exitosa!**\nOpenMota ahora tiene acceso a tu cuenta: **${email}**.\n\nYa puedes preguntarme por tus correos, calendario o archivos de Drive.`);
         } catch (error: any) {
             console.error('Error en gsetup2:', error);
-            ctx.reply(`❌ Error verificando el token: ${error.message}\n\nSTDERR: ${error.stderr}`);
+            ctx.reply(`❌ Error verificando el token: ${error.message}\n\nSTDOUT: ${error.stdout}\nSTDERR: ${error.stderr}`);
         }
     });
 
