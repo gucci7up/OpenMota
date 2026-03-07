@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm", "curl", "cacert"]
+nixPkgs = ["nodejs_20", "curl", "cacert"]
 
 [phases.install]
 cmds = [
