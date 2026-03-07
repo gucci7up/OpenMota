@@ -240,14 +240,29 @@ async function setupBot() {
                 }
             }
 
+            // Robust reply helper
+            const safeReply = async (msg: string, replyToId?: number) => {
+                if (!msg) return;
+                try {
+                    await ctx.reply(msg, { reply_to_message_id: replyToId, parse_mode: 'Markdown' });
+                } catch (e: any) {
+                    if (e.message?.includes('can\'t parse entities')) {
+                        console.warn('⚠️ Telegram Markdown parsing failed, falling back to plain text.');
+                        await ctx.reply(msg, { reply_to_message_id: replyToId });
+                    } else {
+                        throw e;
+                    }
+                }
+            };
+
             // Reply to the specific message if there's any remaining text
             if (response.length > 0) {
-                await ctx.reply(response, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
+                await safeReply(response, messageId);
             }
         } catch (error: any) {
             console.error('❌ Error in message handler:', error);
 
-            // Fallback error message to the user
+            // Fallback error message to the user - always without Markdown to be safe
             await ctx.reply(`Sorry, I encountered an internal error: ${error.message}`);
         }
     });
@@ -322,7 +337,15 @@ async function setupBot() {
 
             // Reply to the specific voice message
             if (agentResponse.length > 0) {
-                await ctx.reply(agentResponse, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
+                try {
+                    await ctx.reply(agentResponse, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
+                } catch (e: any) {
+                    if (e.message?.includes('can\'t parse entities')) {
+                        await ctx.reply(agentResponse, { reply_to_message_id: messageId });
+                    } else {
+                        throw e;
+                    }
+                }
             }
         } catch (error: any) {
             console.error('❌ Error handling voice message:', error);
