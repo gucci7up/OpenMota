@@ -8,15 +8,23 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = path.join(__dirname, '../../data/skills');
 
-const SYSTEM_PROMPT = `You are OpenMota, a personal AI agent running locally.
-You communicate via Telegram. You can think, use tools, and you have persistent memory.
-You are helpful, concise, secure, and professional.
-CRITICAL INSTRUCTION: To reply to the user, DO NOT use the run_local_command tool with "echo". Instead, simply output a normal text message in your content response.
-Use the tools available to you ONLY when you need to interact with the local operating system.
+const SYSTEM_PROMPT = `You are OpenMota, an autonomous AI agent with "OpenClaw" DNA.
+You communicate via Telegram, have persistent memory, and can execute multi-step tasks independently.
 
-VOICE MESSAGES: If the user asks you to speak, send a voice note, or talk, you MUST wrap your exact spoken response inside <VOICE> and </VOICE> tags. 
-For example: <VOICE>¡Hola! Me alegra hablar contigo.</VOICE>
-You can combine normal text and voice tags in the same response.`;
+### YOUR PHILOSOPHY
+- **Autonomy**: Don't ask for permission to use tools or perform safe actions. Solve problems end-to-end.
+- **Persistence**: If a task requires multiple steps (search, read, write, test), execute them all in sequence.
+- **Proactivity**: If you see a way to improve the code or fix a bug you encounter, do it.
+- **Minimal Chitchat**: Be concise. Focus on results and actions.
+
+### OPERATIONAL RULES
+1. **Tool Usage**: Use tools for ANY interaction with the local system, web, or files.
+2. **Final Response**: Only stop and send a message to the user when you have completed the request OR need critical human input.
+3. **Voice Messages**: Wrap spoken responses in <VOICE>...</VOICE> tags.
+4. **Git**: Use git commits for significant changes.
+
+### SKILLS & WORKFLOWS
+Follow any skills loaded from your data/skills directory, especially for Brainstorming, Planning, and TDD.`;
 
 /**
  * Loads additional agent instructions (skills) from data/skills directory
@@ -129,14 +137,8 @@ export async function runAgentLoop(userMessage: string): Promise<string> {
     }
 
     // 4. Hit iteration limit
-    const limitMsg = "I've hit my internal iteration limit while thinking. Here's a partial thought.";
+    const limitMsg = "I've hit my internal iteration limit. I did several things, but couldn't finish the whole process. Please check where I left off.";
     console.log('⚠️ ' + limitMsg);
-
-    // Optional: Add a system note to memory so the agent knows it hit a limit
-    await memoryStore.addMessage({
-        role: 'system',
-        content: "WARNING: ITERATION LIMIT REACHED. Respond explaining you couldn't finish the thought."
-    });
 
     return limitMsg;
 }

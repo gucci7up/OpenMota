@@ -92,7 +92,6 @@ const runLocalCommand: AgentTool = {
 
 // 3. Tool to list files in a directory
 const listDirectory: AgentTool = {
-  // ... (keeps implementation)
   definition: {
     type: 'function',
     function: {
@@ -104,20 +103,89 @@ const listDirectory: AgentTool = {
           dirPath: {
             type: 'string',
             description: 'The absolute or relative path to the directory.'
+          },
+          recursive: {
+            type: 'boolean',
+            description: 'Whether to list files recursively.'
           }
         },
         required: ['dirPath']
       }
     }
   },
-  execute: (args: { dirPath: string }) => {
-    const { dirPath } = args;
+  execute: (args: { dirPath: string, recursive?: boolean }) => {
+    const { dirPath, recursive = false } = args;
     try {
-      const items = fs.readdirSync(dirPath, { withFileTypes: true });
-      const formatted = items.map(item => `[${item.isDirectory() ? 'DIR' : 'FILE'}] ${item.name} `);
+      const getFiles = (dir: string, base: string = ''): string[] => {
+        const items = fs.readdirSync(dir, { withFileTypes: true });
+        let result: string[] = [];
+        for (const item of items) {
+          const relativePath = path.join(base, item.name);
+          const fullPath = path.join(dir, item.name);
+          result.push(`[${item.isDirectory() ? 'DIR' : 'FILE'}] ${relativePath}`);
+          if (recursive && item.isDirectory()) {
+            result = [...result, ...getFiles(fullPath, relativePath)];
+          }
+        }
+        return result;
+      };
+      const formatted = getFiles(dirPath);
       return formatted.join('\n');
     } catch (e: any) {
-      return `Error reading directory: ${e.message} `;
+      return `Error reading directory: ${e.message}`;
+    }
+  }
+};
+
+// 6. Advanced File Manager (OpenClaw style)
+const fileManager: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'file_manager',
+      description: 'Read, write, or delete files on the local system. Use this for building and managing the codebase.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['read', 'write', 'delete'],
+            description: 'The action to perform.'
+          },
+          filePath: {
+            type: 'string',
+            description: 'The path to the file.'
+          },
+          content: {
+            type: 'string',
+            description: 'The content to write (required for "write" action).'
+          }
+        },
+        required: ['action', 'filePath']
+      }
+    }
+  },
+  execute: async (args: { action: 'read' | 'write' | 'delete', filePath: string, content?: string }) => {
+    const { action, filePath, content } = args;
+    const fullPath = path.isAbsolute(filePath) ? filePath : path.join(process.cwd(), filePath);
+
+    try {
+      if (action === 'read') {
+        if (!fs.existsSync(fullPath)) return `Error: File not found at ${filePath}`;
+        return fs.readFileSync(fullPath, 'utf-8');
+      } else if (action === 'write') {
+        const dir = path.dirname(fullPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(fullPath, content || '');
+        return `Successfully wrote to ${filePath}`;
+      } else if (action === 'delete') {
+        if (!fs.existsSync(fullPath)) return `Warning: File already gone at ${filePath}`;
+        fs.unlinkSync(fullPath);
+        return `Successfully deleted ${filePath}`;
+      }
+      return 'Invalid action.';
+    } catch (e: any) {
+      return `Error in file_manager (${action}): ${e.message}`;
     }
   }
 };
@@ -205,7 +273,8 @@ export const availableTools: AgentTool[] = [
   runLocalCommand,
   listDirectory,
   webSearch,
-  readWebpage
+  readWebpage,
+  fileManager
 ];
 
 export const toolsSchema = availableTools.map(t => t.definition);
