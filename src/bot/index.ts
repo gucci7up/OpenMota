@@ -62,9 +62,11 @@ async function setupBot() {
 
         // Determine gog binary path
         let gogPath = 'gog';
-        const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
-        if (fs.existsSync(localBinPath)) {
-            gogPath = `"${localBinPath}"`;
+        if (process.platform === 'win32') {
+            const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
+            if (fs.existsSync(localBinPath)) {
+                gogPath = `"${localBinPath}"`;
+            }
         }
 
         try {
@@ -94,9 +96,11 @@ async function setupBot() {
 
         // Determine gog binary path
         let gogPath = 'gog';
-        const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
-        if (fs.existsSync(localBinPath)) {
-            gogPath = `"${localBinPath}"`;
+        if (process.platform === 'win32') {
+            const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
+            if (fs.existsSync(localBinPath)) {
+                gogPath = `"${localBinPath}"`;
+            }
         }
 
         try {
