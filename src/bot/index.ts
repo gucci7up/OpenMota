@@ -55,12 +55,14 @@ async function setupBot() {
         }
     });
 
-    // 4. Voice message handler
-    bot.on('message:voice', async (ctx) => {
-        const voice = ctx.message.voice;
+    // 4. Voice and Audio message handler
+    bot.on(['message:voice', 'message:audio'], async (ctx) => {
+        const audioFile = ctx.message.voice || ctx.message.audio;
         const messageId = ctx.message.message_id;
 
-        console.log(`\n🎙️ Received voice message (${voice.duration}s)...`);
+        if (!audioFile) return;
+
+        console.log(`\n🎙️ Received audio message (${audioFile.duration}s)...`);
         ctx.replyWithChatAction('typing'); // Usually telegram clients show typing for transcription too
 
         try {
@@ -75,7 +77,7 @@ async function setupBot() {
             const buffer = Buffer.from(arrayBuffer);
 
             // Save temporarily
-            const filePath = path.join(TMP_DIR, `${voice.file_id}.ogg`);
+            const filePath = path.join(TMP_DIR, `${audioFile.file_id}.ogg`);
             fs.writeFileSync(filePath, buffer);
 
             console.log('🎤 Transcribing audio via Groq Whisper...');

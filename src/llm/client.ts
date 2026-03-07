@@ -33,8 +33,7 @@ export const transcribeAudio = async (filePath: string) => {
         // We use any to bypass strict type checking for the file stream in node environments
         const transcription = await groq.audio.transcriptions.create({
             file: stream as any,
-            model: 'whisper-large-v3-turbo', // The fastest whisper model by Groq
-            language: 'es', // Set target language or remove to auto-detect
+            model: 'whisper-large-v3', // Official Groq whisper model
         });
         return transcription.text;
     } catch (error) {
