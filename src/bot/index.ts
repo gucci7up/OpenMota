@@ -98,6 +98,39 @@ async function setupBot() {
         }
     });
 
+    // 3.5 Photo message handler
+    bot.on('message:photo', async (ctx) => {
+        const photo = ctx.message.photo;
+        const caption = ctx.message.caption || "Analiza esta imagen.";
+        const messageId = ctx.message.message_id;
+
+        if (!photo || photo.length === 0) return;
+
+        console.log(`\n📸 Received photo message...`);
+        ctx.replyWithChatAction('typing');
+
+        try {
+            const file = await ctx.getFile();
+            if (!file.file_path) throw new Error("Could not get photo file path.");
+
+            const fileUrl = `https://api.telegram.org/file/bot${config.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+            const response = await fetch(fileUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+
+            console.log('👁️ Sending image to OpenMota Vision...');
+            const agentResponse = await runAgentLoop(caption, false, base64Image);
+
+            if (agentResponse.length > 0) {
+                await ctx.reply(agentResponse, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
+            }
+        } catch (error: any) {
+            console.error('❌ Error handling photo message:', error);
+            await ctx.reply(`Sorry, there was an error processing your image: ${error.message}`);
+        }
+    });
+
     // 4. Voice and Audio message handler
     bot.on(['message:voice', 'message:audio'], async (ctx) => {
         const audioFile = ctx.message.voice || ctx.message.audio;

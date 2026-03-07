@@ -7,9 +7,49 @@ export const groq = new Groq({ apiKey: config.GROQ_API_KEY });
 // Alternatively, you could setup OpenRouter here if GROQ fails or for fallback
 export const chatCompletion = async (messages: any[], tools: any[] = []) => {
     try {
+        // Check if any message contains an image_url
+        const hasImage = messages.some(m => m.image_url);
+
+        // If there's an image, we MUST use OpenRouter with a vision-capable model
+        if (hasImage) {
+            console.log("📸 Vision detected, calling OpenRouter...");
+            const openRouterMessages = messages.map(m => {
+                const content: any[] = [{ type: 'text', text: m.content || '' }];
+                if (m.image_url) {
+                    content.push({
+                        type: 'image_url',
+                        image_url: { url: m.image_url }
+                    });
+                }
+                return { role: m.role, content };
+            });
+
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${config.OPENROUTER_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'google/gemini-2.0-flash-001', // Excellent vision model
+                    messages: openRouterMessages,
+                    tools: tools.length > 0 ? tools : undefined,
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`OpenRouter Vision Error: ${JSON.stringify(errorData)}`);
+            }
+
+            const data = await response.json();
+            return data.choices[0].message;
+        }
+
+        // Default to Groq for text-only (faster)
         const params: any = {
-            messages,
-            model: 'llama-3.3-70b-versatile', // Defaulting to the requested Groq model
+            messages: messages.map(m => ({ role: m.role, content: m.content, name: m.name, tool_call_id: m.tool_call_id, tool_calls: m.tool_calls })),
+            model: 'llama-3.3-70b-versatile',
             temperature: 0.7,
             max_tokens: 4096,
         };
@@ -24,6 +64,38 @@ export const chatCompletion = async (messages: any[], tools: any[] = []) => {
     } catch (error) {
         console.error('Error calling LLM APIs:', error);
         throw error;
+    }
+};
+
+export const getEmbeddings = async (text: string): Promise<number[]> => {
+    const apiKey = config.OPENROUTER_API_KEY;
+    if (!apiKey) {
+        console.warn('OPENROUTER_API_KEY not found, semantic memory will be disabled.');
+        return [];
+    }
+
+    try {
+        const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'openai/text-embedding-3-small',
+                input: text.substring(0, 8000) // Truncate to avoid limits
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`OpenRouter Embedding Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.data[0].embedding;
+    } catch (error) {
+        console.error('Error getting embeddings:', error);
+        return [];
     }
 };
 

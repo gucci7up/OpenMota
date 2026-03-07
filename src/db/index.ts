@@ -1,6 +1,24 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { config } from '../config.js';
+import { getEmbeddings } from '../llm/client.js';
+
+// Helper for Cosine Similarity
+function cosineSimilarity(vecA: number[], vecB: number[]) {
+  if (!vecA || !vecB || vecA.length === 0 || vecB.length === 0) return 0;
+  let dotProduct = 0;
+  let mA = 0;
+  let mB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    mA += vecA[i] * vecA[i];
+    mB += vecB[i] * vecB[i];
+  }
+  mA = Math.sqrt(mA);
+  mB = Math.sqrt(mB);
+  if (mA === 0 || mB === 0) return 0;
+  return dotProduct / (mA * mB);
+}
 
 // Initialize Firebase Admin SDK
 // We need to provide service account credentials for admin access
@@ -34,6 +52,8 @@ export interface Message {
   tool_calls?: any; // JSON representation of tools
   tool_call_id?: string;
   timestamp?: any;
+  embedding?: number[];
+  image_url?: string;
 }
 
 // Database repository functions
@@ -43,13 +63,26 @@ export const memoryStore = {
       // Stringify tool calls if they exist, to store safely
       const toolCallsJson = message.tool_calls ? JSON.stringify(message.tool_calls) : null;
 
+      // Generate embeddings for human/bot text content
+      let embedding: number[] | null = null;
+      if ((message.role === 'user' || message.role === 'assistant') && message.content) {
+        // We only embed if there is content and it's a meaningful role
+        try {
+          embedding = await getEmbeddings(message.content);
+        } catch (e) {
+          console.error("Embedding generation failed, skipping but storing message:", e);
+        }
+      }
+
       const docRef = await messagesCollection.add({
         role: message.role,
         content: message.content || '',
         name: message.name || null,
         tool_calls: toolCallsJson,
         tool_call_id: message.tool_call_id || null,
-        timestamp: FieldValue.serverTimestamp() // Let Firestore handle timestamps
+        timestamp: FieldValue.serverTimestamp(),
+        embedding: embedding,
+        image_url: message.image_url || null
       });
       return docRef.id;
     } catch (error) {
@@ -77,6 +110,7 @@ export const memoryStore = {
 
         if (row.name) msg.name = row.name;
         if (row.tool_call_id) msg.tool_call_id = row.tool_call_id;
+        if (row.image_url) msg.image_url = row.image_url;
         if (row.tool_calls) {
           try {
             msg.tool_calls = JSON.parse(row.tool_calls);
@@ -135,6 +169,40 @@ export const memoryStore = {
       }));
     } catch (error) {
       console.error('Error searching messages:', error);
+      return [];
+    }
+  },
+
+  async semanticSearch(query: string, limit: number = 5): Promise<any[]> {
+    try {
+      const queryEmbedding = await getEmbeddings(query);
+      if (!queryEmbedding || queryEmbedding.length === 0) return [];
+
+      // Fetch last 100 messages that have embeddings
+      const snapshot = await messagesCollection
+        .orderBy('timestamp', 'desc')
+        .limit(100)
+        .get();
+
+      const results = snapshot.docs.map(doc => {
+        const data = doc.data() as Message;
+        const score = cosineSimilarity(queryEmbedding, data.embedding || []);
+        return {
+          role: data.role,
+          content: data.content,
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : null,
+          score
+        };
+      });
+
+      // Sort by score and take top N
+      // Use a similarity threshold (e.g. 0.3 or 0.5 depending on the model)
+      return results
+        .filter(r => r.score > 0.4)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+    } catch (error) {
+      console.error('Error in semantic search:', error);
       return [];
     }
   }

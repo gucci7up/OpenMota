@@ -1,6 +1,6 @@
 import { chatCompletion } from '../llm/client.js';
 import { memoryStore, Message } from '../db/index.js';
-import { toolsSchema, executeTool, setAgentRunner } from './tools.js';
+import { getToolsSchema, executeTool, setAgentRunner, loadCustomTools } from './tools.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,7 +19,7 @@ You communicate via Telegram, have persistent memory, and can execute multi-step
 
 ### OPERATIONAL RULES
 1. **Tool Usage**: Use tools for ANY interaction with the local system, web, or files.
-2. **Intelligence**: Use \`project_map\` at the start of complex tasks to understand the project structure. Use \`search_memory\` to recall past decisions or specific user information from older sessions.
+2. **Intelligence**: Use \`project_map\` at the start of complex tasks to understand the project structure. Use \`semantic_search\` to recall past decisions, concepts, or specific user information from older sessions.
 3. **Orchestration**: Use \`spawn_subagent\` for very complex or long tasks (e.g., "Research this topic and give me a summary", "Create 5 files for the backend"). Sub-agents have their own temporary focus and return a report to you.
 4. **Final Response**: Only stop and send a final message to the user when you have completed **every part** of their request.
 5. **Voice Messages**: Wrap spoken responses in <VOICE>...</VOICE> tags.
@@ -63,17 +63,19 @@ const MAX_ITERATIONS = 15;
  * The core agent loop running the reasoning process
  * @param userMessage The new incoming user message text
  * @param isSubAgent If true, the loop runs in a temporary context without writing to permanent memory
+ * @param imageUrl Optional URL of an image to analyze
  * @returns The final response text to send back to the user
  */
-export async function runAgentLoop(userMessage: string, isSubAgent: boolean = false): Promise<string> {
+export async function runAgentLoop(userMessage: string, isSubAgent: boolean = false, imageUrl?: string): Promise<string> {
     // Local memory for sub-agents to avoid polluting main conversation
-    const localHistory: Message[] = isSubAgent ? [{ role: 'user', content: userMessage }] : [];
+    const localHistory: Message[] = isSubAgent ? [{ role: 'user', content: userMessage, image_url: imageUrl }] : [];
 
     // 1. Add User Message to Memory (only if not sub-agent)
     if (!isSubAgent) {
         await memoryStore.addMessage({
             role: 'user',
-            content: userMessage
+            content: userMessage,
+            image_url: imageUrl
         });
     }
 
@@ -105,7 +107,9 @@ export async function runAgentLoop(userMessage: string, isSubAgent: boolean = fa
         ];
 
         // 2. Call LLM
-        const responseMessage = await chatCompletion(messages, toolsSchema);
+        // Refresh custom tools from disk
+        await loadCustomTools();
+        const responseMessage = await chatCompletion(messages, getToolsSchema());
 
         // Filter properties for database storage
         const messageToSave: Omit<Message, 'id' | 'timestamp'> = {

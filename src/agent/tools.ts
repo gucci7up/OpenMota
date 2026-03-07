@@ -274,7 +274,7 @@ const readWebpage: AgentTool = {
   }
 };
 
-// 7. Search Memory Tool
+// 7. Search Memory Tool (Legacy Keyword)
 const searchMemory: AgentTool = {
   definition: {
     type: 'function',
@@ -296,6 +296,36 @@ const searchMemory: AgentTool = {
   execute: async (args: { query: string }) => {
     const results = await memoryStore.searchMessages(args.query);
     if (results.length === 0) return "No matches found in memory.";
+    return JSON.stringify(results, null, 2);
+  }
+};
+
+// 7b. Semantic Search Memory Tool (Conceptual)
+const semanticSearch: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'semantic_search',
+      description: 'Search through past conversations using conceptual/semantic similarity. Use this for general questions about what was discussed before.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The concept or question to search for.'
+          },
+          limit: {
+            type: 'number',
+            description: 'How many results to return (default: 5).'
+          }
+        },
+        required: ['query']
+      }
+    }
+  },
+  execute: async (args: { query: string, limit?: number }) => {
+    const results = await memoryStore.semanticSearch(args.query, args.limit);
+    if (results.length === 0) return "No conceptual matches found in recent history.";
     return JSON.stringify(results, null, 2);
   }
 };
@@ -379,6 +409,40 @@ const spawnSubagent: AgentTool = {
   }
 };
 
+// 10. Auto-Skills: Develop Tool
+const developTool: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'develop_tool',
+      description: 'Program a new tool for yourself. Provide the tool name, a detailed description, and the TypeScript code for the execute function. The code must follow the AgentTool interface and be self-contained.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'The internal name of the tool (e.g., get_weather).' },
+          description: { type: 'string', description: 'What the tool does and when to use it.' },
+          parameters: { type: 'object', description: 'JSON Schema of the tool parameters.' },
+          code: { type: 'string', description: 'The TypeScript code for the tool. Use "export default { definition: ..., execute: ... }" format.' }
+        },
+        required: ['name', 'description', 'parameters', 'code']
+      }
+    }
+  },
+  execute: async (args: { name: string, description: string, parameters: any, code: string }) => {
+    const toolFilename = `${args.name}.ts`;
+    const toolDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'custom_tools');
+    const toolFile = path.join(toolDir, toolFilename);
+
+    try {
+      if (!fs.existsSync(toolDir)) fs.mkdirSync(toolDir, { recursive: true });
+      fs.writeFileSync(toolFile, args.code);
+      return `Successfully developed and installed tool: ${args.name}. It will be available in the next iteration.`;
+    } catch (e: any) {
+      return `Error developing tool: ${e.message}`;
+    }
+  }
+};
+
 // Combine tools into a map for fast lookup and an array for the LLM
 export const availableTools: AgentTool[] = [
   getSystemInfo,
@@ -388,11 +452,37 @@ export const availableTools: AgentTool[] = [
   readWebpage,
   fileManager,
   searchMemory,
+  semanticSearch,
   projectMap,
-  spawnSubagent
+  spawnSubagent,
+  developTool
 ];
 
-export const toolsSchema = availableTools.map(t => t.definition);
+/**
+ * Dynamically loads custom tools from the custom_tools directory
+ */
+export async function loadCustomTools() {
+  const toolDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'custom_tools');
+  if (!fs.existsSync(toolDir)) return;
+
+  try {
+    const files = fs.readdirSync(toolDir).filter(f => f.endsWith('.ts') || f.endsWith('.js'));
+    for (const file of files) {
+      // Use dynamic import to load the tool
+      const toolModule = await import(`./custom_tools/${file}?cache=${Date.now()}`);
+      if (toolModule.default) {
+        // Only add if not already there
+        if (!availableTools.find(t => t.definition.function.name === toolModule.default.definition.function.name)) {
+          availableTools.push(toolModule.default);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error loading custom tools:", e);
+  }
+}
+
+export const getToolsSchema = () => availableTools.map(t => t.definition);
 
 export async function executeTool(toolName: string, toolArgs: string): Promise<string> {
   const tool = availableTools.find(t => t.definition.function.name === toolName);
