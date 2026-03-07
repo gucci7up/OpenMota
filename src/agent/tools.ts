@@ -241,6 +241,7 @@ const googleWorkspaceManager: AgentTool = {
       // Linux/Dokploy logic
       const localBinPath = path.join(process.cwd(), 'bin', 'gog');
       if (fs.existsSync(localBinPath)) {
+        gogPath = `"${localBinPath}"`;
       }
     }
 
