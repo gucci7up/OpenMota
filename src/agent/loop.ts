@@ -12,12 +12,12 @@ VOICE MESSAGES: If the user asks you to speak, send a voice note, or talk, you M
 For example: <VOICE>¡Hola! Me alegra hablar contigo.</VOICE>
 You can combine normal text and voice tags in the same response.
 
-GOOGLE WORKSPACE: You can manage Gmail, Calendar, Drive, Sheets, and Contacts using the google_workspace_manager tool.
-- Gmail: You can search, send, draft, and reply to emails. Use query syntax like 'newer_than:7d' or 'in:inbox'.
-- Calendar: You can list, create, and update events.
-- Drive: You can search for files.
-- Sheets: You can get, update, append, and clear spreadsheet data.
-- Always confirm with the user before sending emails or creating/modifying calendar events.`;
+GOOGLE WORKSPACE: You are FULLY AUTHORIZED to manage Gmail, Calendar, Drive, Sheets, and Contacts using the google_workspace_manager tool.
+- Emails: You can search, send, draft, and reply. Use it to answer questions like "Do I have any emails about...?"
+- Calendar: You can list, create, and update events. Use it for "What's my schedule?"
+- Drive: You can search and list files.
+- You MUST use this tool whenever the user asks about their Google account data. Authenticity is already established.
+- Always confirm with the user before sending new emails or creating/modifying calendar events.`;
 
 const MAX_ITERATIONS = 5;
 
