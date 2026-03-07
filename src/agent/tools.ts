@@ -200,12 +200,12 @@ const readWebpage: AgentTool = {
 };
 
 // 6. Tool to manage Google Workspace (Gmail, Calendar, Drive) via gog CLI
-const googleWorkspaceManager: AgentTool = {
+const googleWorkspace: AgentTool = {
   definition: {
     type: 'function',
     function: {
-      name: 'google_workspace_manager',
-      description: 'Interact with Google Workspace (Gmail, Calendar, Drive, Sheets) using gog CLI. Supports searching, reading, sending emails, and managing calendar events.',
+      name: 'google_workspace',
+      description: 'Interact with Google services. Use this tool for ANY question about Gmail (emails), Calendar (meetings/agenda), or Drive (files).',
       parameters: {
         type: 'object',
         properties: {
@@ -289,7 +289,7 @@ export const availableTools: AgentTool[] = [
   listDirectory,
   webSearch,
   readWebpage,
-  googleWorkspaceManager
+  googleWorkspace
 ];
 
 export const toolsSchema = availableTools.map(t => t.definition);

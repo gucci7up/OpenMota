@@ -65,6 +65,22 @@ async function setupBot() {
         }
     });
 
+    bot.command('gtools', async (ctx) => {
+        try {
+            const { toolsSchema } = await import('../agent/tools.js');
+            const schemaStr = JSON.stringify(toolsSchema, null, 2);
+            // Send in chunks if it's too long
+            if (schemaStr.length > 4000) {
+                await ctx.reply(`🛠️ **Tools Schema (Part 1):**\n\`\`\`json\n${schemaStr.substring(0, 3900)}\n\`\`\``, { parse_mode: 'Markdown' });
+                await ctx.reply(`\`\`\`json\n${schemaStr.substring(3900)}\n\`\`\``, { parse_mode: 'Markdown' });
+            } else {
+                ctx.reply(`🛠️ **Tools Schema:**\n\`\`\`json\n${schemaStr}\n\`\`\``, { parse_mode: 'Markdown' });
+            }
+        } catch (e: any) {
+            ctx.reply(`❌ Error getting tools schema: ${e.message}`);
+        }
+    });
+
     // --- Google Workspace Setup Commands ---
 
     bot.command('gsetup1', async (ctx) => {
