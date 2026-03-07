@@ -8,15 +8,13 @@ import { transcribeAudio, generateSpeech } from '../llm/client.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync, execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '../../data');
 const TMP_DIR = path.join(DATA_DIR, 'tmp');
-const GOG_CONFIG_DIR = path.join(DATA_DIR, 'gog-config');
 
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
-if (!fs.existsSync(GOG_CONFIG_DIR)) fs.mkdirSync(GOG_CONFIG_DIR, { recursive: true });
 
 // Initialize the bot
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
@@ -33,173 +31,6 @@ async function setupBot() {
     bot.command('clear', async (ctx) => {
         await memoryStore.clearMemory();
         ctx.reply('🧹 Memory cleared. I have forgotten our past conversations.');
-    });
-
-    bot.command('gdebug', async (ctx) => {
-        try {
-            const platform = process.platform;
-            const cwd = process.cwd();
-            const configExists = fs.existsSync(GOG_CONFIG_DIR);
-            const dataExists = fs.existsSync(DATA_DIR);
-            const gogPath = process.platform === 'win32' ? path.join(process.cwd(), 'bin', 'gog.exe') : '/app/bin/gog';
-            const gogExists = fs.existsSync(gogPath);
-
-            let gogVersion = 'Unknown';
-            if (gogExists) {
-                try {
-                    gogVersion = execSync(`${gogPath} --version`, { encoding: 'utf-8', env: { ...process.env, XDG_CONFIG_HOME: GOG_CONFIG_DIR } }).trim();
-                } catch (e) { gogVersion = 'Error getting version'; }
-            }
-
-            ctx.reply(`🔍 **Bot Debug Info:**\n\n` +
-                `- **Platform:** ${platform}\n` +
-                `- **CWD:** ${cwd}\n` +
-                `- **Data Dir:** ${DATA_DIR} (${dataExists ? '✅' : '❌'})\n` +
-                `- **Config Dir:** ${GOG_CONFIG_DIR} (${configExists ? '✅' : '❌'})\n` +
-                `- **gog Path:** ${gogPath} (${gogExists ? '✅' : '❌'})\n` +
-                `- **gog Version:** ${gogVersion}\n` +
-                `- **XDG_CONFIG_HOME:** ${GOG_CONFIG_DIR}\n` +
-                `- **Time:** ${new Date().toISOString()}`, { parse_mode: 'Markdown' });
-        } catch (e: any) {
-            ctx.reply(`❌ Error in gdebug: ${e.message}`);
-        }
-    });
-
-    bot.command('gtools', async (ctx) => {
-        try {
-            const { toolsSchema } = await import('../agent/tools.js');
-            const schemaStr = JSON.stringify(toolsSchema, null, 2);
-            // Send in chunks if it's too long
-            if (schemaStr.length > 4000) {
-                await ctx.reply(`🛠️ **Tools Schema (Part 1):**\n\`\`\`json\n${schemaStr.substring(0, 3900)}\n\`\`\``, { parse_mode: 'Markdown' });
-                await ctx.reply(`\`\`\`json\n${schemaStr.substring(3900)}\n\`\`\``, { parse_mode: 'Markdown' });
-            } else {
-                ctx.reply(`🛠️ **Tools Schema:**\n\`\`\`json\n${schemaStr}\n\`\`\``, { parse_mode: 'Markdown' });
-            }
-        } catch (e: any) {
-            ctx.reply(`❌ Error getting tools schema: ${e.message}`);
-        }
-    });
-
-    // --- Google Workspace Setup Commands ---
-
-    bot.command('gsetup1', async (ctx) => {
-        const email = ctx.match;
-        if (!email) {
-            return ctx.reply('❌ Por favor, proporciona tu email de Google. Uso: `/gsetup1 tu@email.com`', { parse_mode: 'Markdown' });
-        }
-
-        let clientSecretPath = path.join(process.cwd(), 'client_secret.json');
-
-        // Option 2 Fallback: Environment Variable
-        if (!fs.existsSync(clientSecretPath)) {
-            const envSecret = process.env.GOOGLE_CLIENT_SECRET_JSON;
-            if (envSecret) {
-                try {
-                    clientSecretPath = path.join(TMP_DIR, 'client_secret.json');
-                    if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
-                    fs.writeFileSync(clientSecretPath, envSecret);
-                    console.log('✅ Created temporary client_secret.json from environment variable.');
-                } catch (e: any) {
-                    return ctx.reply(`❌ Error al crear archivo temporal de credenciales: ${e.message}`);
-                }
-            } else {
-                return ctx.reply('❌ No se encontró `client_secret.json` ni la variable de entorno `GOOGLE_CLIENT_SECRET_JSON`. Por favor, configura uno de los dos.');
-            }
-        }
-
-        // Determine gog binary path
-        let gogPath = 'gog';
-        if (process.platform === 'win32') {
-            const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
-            if (fs.existsSync(localBinPath)) {
-                gogPath = `"${localBinPath}"`;
-            }
-        } else {
-            // Linux/Dokploy logic
-            const localBinPath = path.join(process.cwd(), 'bin', 'gog');
-            if (fs.existsSync(localBinPath)) {
-                gogPath = `"${localBinPath}"`;
-            }
-        }
-
-        try {
-            ctx.reply('⏳ Iniciando proceso de autenticación... configurando credenciales...');
-
-            const execOptions = {
-                encoding: 'utf-8' as const,
-                env: {
-                    ...process.env,
-                    XDG_CONFIG_HOME: GOG_CONFIG_DIR,
-                    HOME: DATA_DIR,
-                    GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD || 'openmota-secret-key'
-                }
-            };
-
-            // Step 0: Set credentials file
-            // Use quotes if path has spaces, but execFileSync handles it better
-            execFileSync(gogPath.replace(/"/g, ''), ['auth', 'credentials', clientSecretPath], execOptions);
-
-            // Step 1: Start remote auth flow
-            const output = execFileSync(gogPath.replace(/"/g, ''), ['auth', 'add', email, '--remote', '--step', '1', '--services', 'all'], execOptions);
-
-            // Check if state file was created for debugging
-            const authStatePath = path.join(GOG_CONFIG_DIR, 'gogcli/manual_auth_state.json');
-            const stateExists = fs.existsSync(authStatePath);
-            console.log(`📡 Step 1 state file exists at ${authStatePath}: ${stateExists}`);
-
-            ctx.reply(`✅ **Paso 1 completado.**\n\nPor favor, visita el siguiente enlace, autoriza la aplicación y **copia la URL final** que te dé Google:\n\n\`${output.trim()}\`\n\nLuego, usa el comando:\n\`/gsetup2 ${email} [URL_FINAL]\``, { parse_mode: 'Markdown' });
-        } catch (error: any) {
-            console.error('Error en gsetup1:', error);
-            ctx.reply(`❌ Error en paso 1: ${error.message}\n\nSTDOUT: ${error.stdout}\nSTDERR: ${error.stderr}`);
-        }
-    });
-
-    bot.command('gsetup2', async (ctx) => {
-        const parts = ctx.match.split(' ');
-        if (parts.length < 2) {
-            return ctx.reply('❌ Uso: `/gsetup2 tu@email.com [URL_CON_TOKEN]`', { parse_mode: 'Markdown' });
-        }
-
-        const email = parts[0];
-        const authUrl = parts[1];
-
-        // Determine gog binary path
-        let gogPath = 'gog';
-        if (process.platform === 'win32') {
-            const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
-            if (fs.existsSync(localBinPath)) {
-                gogPath = `"${localBinPath}"`;
-            }
-        } else {
-            // Linux/Dokploy logic
-            const localBinPath = path.join(process.cwd(), 'bin', 'gog');
-            if (fs.existsSync(localBinPath)) {
-                gogPath = `"${localBinPath}"`;
-            }
-        }
-
-        try {
-            ctx.reply('⏳ Verificando token y finalizando autenticación...');
-
-            const execOptions = {
-                encoding: 'utf-8' as const,
-                env: {
-                    ...process.env,
-                    XDG_CONFIG_HOME: GOG_CONFIG_DIR,
-                    HOME: DATA_DIR,
-                    GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD || 'openmota-secret-key'
-                }
-            };
-
-            // Step 2: Exchange code/URL for token
-            const output = execFileSync(gogPath.replace(/"/g, ''), ['auth', 'add', email, '--remote', '--step', '2', '--auth-url', authUrl], execOptions);
-
-            ctx.reply(`🎉 **¡Autenticación exitosa!**\nOpenMota ahora tiene acceso a tu cuenta: **${email}**.\n\nYa puedes preguntarme por tus correos, calendario o archivos de Drive.`);
-        } catch (error: any) {
-            console.error('Error en gsetup2:', error);
-            ctx.reply(`❌ Error verificando el token: ${error.message}\n\nSTDOUT: ${error.stdout}\nSTDERR: ${error.stderr}`);
-        }
     });
 
     // 3. Main message handler

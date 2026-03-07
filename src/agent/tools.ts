@@ -199,97 +199,13 @@ const readWebpage: AgentTool = {
   }
 };
 
-// 6. Tool to manage Google Workspace (Gmail, Calendar, Drive) via gog CLI
-const googleWorkspace: AgentTool = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'google_workspace',
-      description: 'Interact with Google services. Use this tool for ANY question about Gmail (emails), Calendar (meetings/agenda), or Drive (files).',
-      parameters: {
-        type: 'object',
-        properties: {
-          subcommand: {
-            type: 'string',
-            enum: ['gmail', 'calendar', 'drive', 'sheets', 'docs', 'contacts'],
-            description: 'The Google service to interact with.'
-          },
-          action: {
-            type: 'string',
-            description: 'The specific action or command (e.g., "search", "send", "events", "list").'
-          },
-          args: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Additional arguments for the command (e.g., ["--max", "10", "newer_than:7d"]).'
-          }
-        },
-        required: ['subcommand', 'action']
-      }
-    }
-  },
-  execute: async (args: { subcommand: string, action: string, args?: string[] }) => {
-    const { subcommand, action, args: commandArgs = [] } = args;
-
-    // Determine gog binary path
-    let gogPath = 'gog';
-    if (process.platform === 'win32') {
-      const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
-      if (fs.existsSync(localBinPath)) {
-        gogPath = `"${localBinPath}"`;
-      }
-    } else {
-      // Linux/Dokploy logic
-      const localBinPath = path.join(process.cwd(), 'bin', 'gog');
-      if (fs.existsSync(localBinPath)) {
-        gogPath = `"${localBinPath}"`;
-      }
-    }
-
-    // Construct the full command
-    const DATA_DIR = path.join(process.cwd(), 'data');
-    const GOG_CONFIG_DIR = path.join(DATA_DIR, 'gog-config');
-
-    // Safety check - specifically for gog
-    console.log(`🤖 Executing Google Workspace: ${gogPath} ${subcommand} ${action} ${commandArgs.join(' ')} `);
-
-    try {
-      // Ensure the config directory exists
-      fs.mkdirSync(GOG_CONFIG_DIR, { recursive: true });
-
-      const execOptions = {
-        encoding: 'utf-8' as const,
-        timeout: 30000,
-        env: {
-          ...process.env,
-          GOG_NO_INPUT: 'true',
-          XDG_CONFIG_HOME: GOG_CONFIG_DIR,
-          HOME: DATA_DIR,
-          GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD || 'openmota-secret-key'
-        }
-      };
-
-      // Execute with a longer timeout for network-bound operations
-      const output = execFileSync(gogPath.replace(/"/g, ''), [subcommand, action, ...commandArgs], execOptions);
-      return output.trim() || 'Command executed successfully.';
-    } catch (e: any) {
-      const errorMsg = e.message || '';
-      if (errorMsg.includes('not found') || errorMsg.includes('not recognized') || errorMsg.includes('ENOENT')) {
-        return "Error: The 'gog' CLI is not installed or not in the system PATH. Please ensure it is installed and configured (check nixpacks.toml for Dokploy or run local install).";
-      }
-      return `Error executing Google Workspace command: ${e.message} \nSTDOUT: ${e.stdout || ''} \nSTDERR: ${e.stderr || ''} `;
-    }
-  }
-};
-
 // Combine tools into a map for fast lookup and an array for the LLM
 export const availableTools: AgentTool[] = [
   getSystemInfo,
   runLocalCommand,
   listDirectory,
   webSearch,
-  readWebpage,
-  googleWorkspace
+  readWebpage
 ];
 
 export const toolsSchema = availableTools.map(t => t.definition);

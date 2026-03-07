@@ -10,14 +10,7 @@ Use the tools available to you ONLY when you need to interact with the local ope
 
 VOICE MESSAGES: If the user asks you to speak, send a voice note, or talk, you MUST wrap your exact spoken response inside <VOICE> and </VOICE> tags. 
 For example: <VOICE>¡Hola! Me alegra hablar contigo.</VOICE>
-You can combine normal text and voice tags in the same response.
-
-GOOGLE WORKSPACE: You are FULLY AUTHORIZED to manage Gmail, Calendar, Drive, Sheets, and Contacts using the google_workspace tool.
-- Emails: You can search, send, draft, and reply. Use it to answer questions like "Do I have any emails about...?"
-- Calendar: You can list, create, and update events. Use it for "What's my schedule?"
-- Drive: You can search and list files.
-- You MUST use this tool whenever the user asks about their Google account data. Authenticity is already established.
-- Always confirm with the user before sending new emails or creating/modifying calendar events.`;
+You can combine normal text and voice tags in the same response.`;
 
 const MAX_ITERATIONS = 5;
 
