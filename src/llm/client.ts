@@ -43,7 +43,8 @@ export const transcribeAudio = async (filePath: string) => {
 };
 
 export const generateSpeech = async (text: string): Promise<Buffer> => {
-    if (!config.ELEVENLABS_API_KEY) {
+    const apiKey = config.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY;
+    if (!apiKey || apiKey.trim() === '') {
         throw new Error("ELEVENLABS_API_KEY is not configured.");
     }
 
@@ -54,7 +55,7 @@ export const generateSpeech = async (text: string): Promise<Buffer> => {
     const response = await fetch(url, {
         method: 'POST',
         headers: {
-            'xi-api-key': config.ELEVENLABS_API_KEY,
+            'xi-api-key': apiKey as string,
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({

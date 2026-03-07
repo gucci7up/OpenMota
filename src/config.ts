@@ -14,7 +14,7 @@ const envSchema = z.object({
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_MODEL: z.string().default('openrouter/free'),
     FIREBASE_SERVICE_ACCOUNT: z.string().min(1, 'FIREBASE_SERVICE_ACCOUNT is required (JSON string)'),
-    ELEVENLABS_API_KEY: z.string().optional(),
+    ELEVENLABS_API_KEY: z.string().optional().transform(e => e === "" ? undefined : e),
 });
 
 const _env = envSchema.safeParse(process.env);
