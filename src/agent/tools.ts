@@ -8,6 +8,7 @@ import { search } from 'duck-duck-scrape';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
+import { memoryStore } from '../db/index.js';
 
 // Type definition for a tool executor
 type ToolExecutor = (args: any) => Promise<string> | string;
@@ -267,6 +268,80 @@ const readWebpage: AgentTool = {
   }
 };
 
+// 7. Search Memory Tool
+const searchMemory: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'search_memory',
+      description: 'Search through past conversation history using a keyword.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The keyword or phrase to search for.'
+          }
+        },
+        required: ['query']
+      }
+    }
+  },
+  execute: async (args: { query: string }) => {
+    const results = await memoryStore.searchMessages(args.query);
+    if (results.length === 0) return "No matches found in memory.";
+    return JSON.stringify(results, null, 2);
+  }
+};
+
+// 8. Project Map Tool
+const projectMap: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'project_map',
+      description: 'Generate a visual tree of the current project structure.',
+      parameters: {
+        type: 'object',
+        properties: {
+          depth: {
+            type: 'number',
+            description: 'The maximum depth of the tree (default: 3).'
+          }
+        },
+        required: []
+      }
+    }
+  },
+  execute: async (args: { depth?: number }) => {
+    const depth = args.depth || 3;
+    const ignore = ['node_modules', '.git', '.firebase', 'dist', '.next'];
+
+    const getTree = (dir: string, currentDepth: number): string => {
+      if (currentDepth > depth) return '';
+      const items = fs.readdirSync(dir, { withFileTypes: true });
+      let output = '';
+
+      for (const item of items) {
+        if (ignore.includes(item.name)) continue;
+        const prefix = '  '.repeat(currentDepth - 1);
+        output += `${prefix}${item.isDirectory() ? '📁' : '📄'} ${item.name}\n`;
+        if (item.isDirectory()) {
+          output += getTree(path.join(dir, item.name), currentDepth + 1);
+        }
+      }
+      return output;
+    };
+
+    try {
+      const tree = getTree(process.cwd(), 1);
+      return `Project Structure (Depth: ${depth}):\n${tree}`;
+    } catch (e: any) {
+      return `Error generating project map: ${e.message}`;
+    }
+  }
+};
+
 // Combine tools into a map for fast lookup and an array for the LLM
 export const availableTools: AgentTool[] = [
   getSystemInfo,
@@ -274,7 +349,9 @@ export const availableTools: AgentTool[] = [
   listDirectory,
   webSearch,
   readWebpage,
-  fileManager
+  fileManager,
+  searchMemory,
+  projectMap
 ];
 
 export const toolsSchema = availableTools.map(t => t.definition);

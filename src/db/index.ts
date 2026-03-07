@@ -114,5 +114,28 @@ export const memoryStore = {
     } catch (error) {
       console.error('Error clearing Firestore memory:', error);
     }
+  },
+
+  async searchMessages(query: string): Promise<any[]> {
+    try {
+      const snapshot = await messagesCollection
+        .orderBy('timestamp', 'desc')
+        .limit(200)
+        .get();
+
+      const term = query.toLowerCase();
+      const results = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((msg: any) => msg.content && msg.content.toLowerCase().includes(term));
+
+      return results.map((row: any) => ({
+        role: row.role,
+        content: row.content,
+        timestamp: row.timestamp?.toDate ? row.timestamp.toDate().toISOString() : null
+      }));
+    } catch (error) {
+      console.error('Error searching messages:', error);
+      return [];
+    }
   }
 };
