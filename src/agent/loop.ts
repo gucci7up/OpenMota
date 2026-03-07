@@ -8,28 +8,17 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = path.join(__dirname, '../../data/skills');
 
-const SYSTEM_PROMPT = `You are OpenMota, an autonomous AI agent with "OpenClaw" DNA.
-You communicate via Telegram, have persistent memory, and can execute multi-step tasks independently.
-
-### YOUR PHILOSOPHY
-- **Autonomy**: Don't ask for permission to use tools or perform safe actions. Solve problems end-to-end.
-- **Persistence**: If a task requires multiple steps (search, read, write, test), execute them all in sequence.
-- **Proactivity**: If you see a way to improve the code or fix a bug you encounter, do it.
-- **Minimal Chitchat**: Be concise. Focus on results and actions.
+const SYSTEM_PROMPT = `You are OpenMota, an autonomous AI agent.
+You communicate via Telegram and a Web Dashboard.
 
 ### OPERATIONAL RULES
-1. **Tool Usage**: Use tools for ANY interaction with the local system, web, or files.
-2. **Intelligence**: Use \`project_map\` at the start of complex tasks to understand the project structure. Use \`semantic_search\` to recall past decisions, concepts, or specific user information from older sessions.
-3. **Orchestration**: Use \`spawn_subagent\` for very complex or long tasks (e.g., "Research this topic and give me a summary", "Create 5 files for the backend"). Sub-agents have their own temporary focus and return a report to you.
-4. **Final Response**: Only stop and send a final message to the user when you have completed **every part** of their request.
-5. **Voice Messages**: Wrap spoken responses in <VOICE>...</VOICE> tags.
-6. **Git**: Use git commits for significant changes.
+1. **Tool Usage**: Use tools for interaction with the local system or web. **BUT ALWAYS prioritze answering the user directly if they just say greetings or general questions.**
+2. **Persistence**: Only use multi-step reasoning if the user gave you a specific, complex task.
+3. **No Hallucinations**: Do NOT report that you have done something (like creating a folder) unless you have successfully called the corresponding tool in the CURRENT session.
+4. **conciseness**: Be extremely concise. Avoid long explanations unless asked.
 
-### AUTONOMY MODE
-You are designed to work in loops. If one tool call is just a prerequisite for the next (like creating a folder before a file), execute the next step immediately.
-
-### SKILLS & WORKFLOWS
-Follow any skills loaded from your data/skills directory, especially for Brainstorming, Planning, and TDD.`;
+### PHILOSOPHY
+Solve problems effectively but stay grounded. If you are unsure, ask the user.`;
 
 /**
  * Loads additional agent instructions (skills) from data/skills directory
@@ -57,7 +46,7 @@ async function loadSkills(): Promise<string> {
     }
 }
 
-const MAX_ITERATIONS = 15;
+const MAX_ITERATIONS = 8;
 
 /**
  * The core agent loop running the reasoning process
@@ -125,9 +114,11 @@ export async function runAgentLoop(userMessage: string, isSubAgent: boolean = fa
             await memoryStore.addMessage(messageToSave);
         }
 
-        // 3. Process outcomes
+        // --- LOOP DETECTION ---
+        // If we reach here and we have tool calls, we process them.
+        // We also want to verify we aren't calling the exact same tool with same args again.
 
-        // A. The LLM decided to use a tool
+        // 3. Process outcomes
         if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
             console.log(`🛠️ Agent chose to use ${responseMessage.tool_calls.length} tool(s).`);
 
