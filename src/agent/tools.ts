@@ -264,7 +264,8 @@ const googleWorkspaceManager: AgentTool = {
           ...process.env,
           GOG_NO_INPUT: 'true',
           XDG_CONFIG_HOME: GOG_CONFIG_DIR,
-          HOME: DATA_DIR
+          HOME: DATA_DIR,
+          GOG_KEYRING_PASSWORD: process.env.GOG_KEYRING_PASSWORD || 'openmota-secret-key'
         }
       };
 
