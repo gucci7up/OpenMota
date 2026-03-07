@@ -1,4 +1,3 @@
-```typescript
 import { z } from 'zod';
 import os from 'os';
 import fs from 'fs';
@@ -46,7 +45,7 @@ const getSystemInfo: AgentTool = {
       platform: os.platform(),
       arch: os.arch(),
       cpus: os.cpus().length,
-      memory: `${ Math.round(os.totalmem() / 1024 / 1024 / 1024) } GB`,
+      memory: `${Math.round(os.totalmem() / 1024 / 1024 / 1024)} GB`,
       hostname: os.hostname(),
       uptime: os.uptime()
     });
@@ -86,7 +85,7 @@ const runLocalCommand: AgentTool = {
       const output = execSync(command, { encoding: 'utf-8', timeout: 10000 });
       return output.trim() || 'Command executed successfully with no output.';
     } catch (e: any) {
-      return `Error executing command: ${ e.message } `;
+      return `Error executing command: ${e.message} `;
     }
   }
 };
@@ -115,10 +114,10 @@ const listDirectory: AgentTool = {
     const { dirPath } = args;
     try {
       const items = fs.readdirSync(dirPath, { withFileTypes: true });
-      const formatted = items.map(item => `[${ item.isDirectory() ? 'DIR' : 'FILE' }] ${ item.name } `);
+      const formatted = items.map(item => `[${item.isDirectory() ? 'DIR' : 'FILE'}] ${item.name} `);
       return formatted.join('\n');
     } catch (e: any) {
-      return `Error reading directory: ${ e.message } `;
+      return `Error reading directory: ${e.message} `;
     }
   }
 };
@@ -148,11 +147,11 @@ const webSearch: AgentTool = {
       if (!results.results || results.results.length === 0) return "No results found.";
 
       const formatted = results.results.slice(0, 5).map(r =>
-        `Title: ${ r.title } \nURL: ${ r.url } \nDescription: ${ r.description } \n`
+        `Title: ${r.title} \nURL: ${r.url} \nDescription: ${r.description} \n`
       );
       return formatted.join('\n');
     } catch (e: any) {
-      return `Error performing web search: ${ e.message } `;
+      return `Error performing web search: ${e.message} `;
     }
   }
 };
@@ -195,7 +194,7 @@ const readWebpage: AgentTool = {
       // Send max length to avoid exceeding token limit (roughly 20k characters)
       return markdown.substring(0, 20000);
     } catch (e: any) {
-      return `Error reading webpage: ${ e.message } `;
+      return `Error reading webpage: ${e.message} `;
     }
   }
 };
@@ -252,7 +251,7 @@ const googleWorkspaceManager: AgentTool = {
     const GOG_CONFIG_DIR = path.join(DATA_DIR, 'gog-config');
 
     // Safety check - specifically for gog
-    console.log(`🤖 Executing Google Workspace: ${ gogPath } ${ subcommand } ${ action } ${ commandArgs.join(' ') } `);
+    console.log(`🤖 Executing Google Workspace: ${gogPath} ${subcommand} ${action} ${commandArgs.join(' ')} `);
 
     try {
       // Ensure the config directory exists
@@ -277,7 +276,7 @@ const googleWorkspaceManager: AgentTool = {
       if (errorMsg.includes('not found') || errorMsg.includes('not recognized') || errorMsg.includes('ENOENT')) {
         return "Error: The 'gog' CLI is not installed or not in the system PATH. Please ensure it is installed and configured (check nixpacks.toml for Dokploy or run local install).";
       }
-      return `Error executing Google Workspace command: ${ e.message } \nSTDOUT: ${ e.stdout || '' } \nSTDERR: ${ e.stderr || '' } `;
+      return `Error executing Google Workspace command: ${e.message} \nSTDOUT: ${e.stdout || ''} \nSTDERR: ${e.stderr || ''} `;
     }
   }
 };
@@ -303,12 +302,12 @@ export async function executeTool(toolName: string, toolArgs: string): Promise<s
 
   try {
     const parsedArgs = JSON.parse(toolArgs) || {};
-    console.log(`🔧 Executing tool: ${ toolName } `, parsedArgs);
+    console.log(`🔧 Executing tool: ${toolName} `, parsedArgs);
     const result = await tool.execute(parsedArgs);
-    console.log(`✅ Tool result(${ toolName }): `, result.substring(0, 100) + (result.length > 100 ? '...' : ''));
+    console.log(`✅ Tool result(${toolName}): `, result.substring(0, 100) + (result.length > 100 ? '...' : ''));
     return result;
   } catch (error: any) {
-    console.error(`❌ Error executing tool ${ toolName }: `, error);
-    return `Error during tool execution: ${ error.message } `;
+    console.error(`❌ Error executing tool ${toolName}: `, error);
+    return `Error during tool execution: ${error.message} `;
   }
 }
