@@ -1,6 +1,6 @@
 import { chatCompletion } from '../llm/client.js';
 import { memoryStore, Message } from '../db/index.js';
-import { toolsSchema, executeTool } from './tools.js';
+import { toolsSchema, executeTool, setAgentRunner } from './tools.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,9 +20,10 @@ You communicate via Telegram, have persistent memory, and can execute multi-step
 ### OPERATIONAL RULES
 1. **Tool Usage**: Use tools for ANY interaction with the local system, web, or files.
 2. **Intelligence**: Use \`project_map\` at the start of complex tasks to understand the project structure. Use \`search_memory\` to recall past decisions or specific user information from older sessions.
-3. **Final Response**: Only stop and send a final message to the user when you have completed **every part** of their request (e.g., if asked for a server and a readme, do both before stopping).
-4. **Voice Messages**: Wrap spoken responses in <VOICE>...</VOICE> tags.
-5. **Git**: Use git commits for significant changes.
+3. **Orchestration**: Use \`spawn_subagent\` for very complex or long tasks (e.g., "Research this topic and give me a summary", "Create 5 files for the backend"). Sub-agents have their own temporary focus and return a report to you.
+4. **Final Response**: Only stop and send a final message to the user when you have completed **every part** of their request.
+5. **Voice Messages**: Wrap spoken responses in <VOICE>...</VOICE> tags.
+6. **Git**: Use git commits for significant changes.
 
 ### AUTONOMY MODE
 You are designed to work in loops. If one tool call is just a prerequisite for the next (like creating a folder before a file), execute the next step immediately.
@@ -61,25 +62,37 @@ const MAX_ITERATIONS = 15;
 /**
  * The core agent loop running the reasoning process
  * @param userMessage The new incoming user message text
+ * @param isSubAgent If true, the loop runs in a temporary context without writing to permanent memory
  * @returns The final response text to send back to the user
  */
-export async function runAgentLoop(userMessage: string): Promise<string> {
-    // 1. Add User Message to Memory
-    await memoryStore.addMessage({
-        role: 'user',
-        content: userMessage
-    });
+export async function runAgentLoop(userMessage: string, isSubAgent: boolean = false): Promise<string> {
+    // Local memory for sub-agents to avoid polluting main conversation
+    const localHistory: Message[] = isSubAgent ? [{ role: 'user', content: userMessage }] : [];
+
+    // 1. Add User Message to Memory (only if not sub-agent)
+    if (!isSubAgent) {
+        await memoryStore.addMessage({
+            role: 'user',
+            content: userMessage
+        });
+    }
 
     let iterations = 0;
 
     // The loop
     while (iterations < MAX_ITERATIONS) {
         iterations++;
-        console.log(`🤖 Agent thinking... (Iteration ${iterations}/${MAX_ITERATIONS})`);
+        const logPrefix = isSubAgent ? `[Sub-Agent]` : `🤖`;
+        console.log(`${logPrefix} thinking... (Iteration ${iterations}/${MAX_ITERATIONS})`);
 
         // Fetch memory
-        // Only fetch past 30 messages to keep context window reasonable
-        const history = await memoryStore.getRecentMessages(30);
+        let history: Message[] = [];
+        if (isSubAgent) {
+            history = localHistory;
+        } else {
+            // Only fetch past 30 messages to keep context window reasonable
+            history = await memoryStore.getRecentMessages(30);
+        }
 
         // Load dynamic skills
         const skillsContent = await loadSkills();
@@ -102,7 +115,11 @@ export async function runAgentLoop(userMessage: string): Promise<string> {
         };
 
         // Save Assistant Response to Memory
-        await memoryStore.addMessage(messageToSave);
+        if (isSubAgent) {
+            localHistory.push(messageToSave as Message);
+        } else {
+            await memoryStore.addMessage(messageToSave);
+        }
 
         // 3. Process outcomes
 
@@ -118,12 +135,18 @@ export async function runAgentLoop(userMessage: string): Promise<string> {
                 );
 
                 // Save the result to Memory
-                await memoryStore.addMessage({
+                const toolMsg: any = {
                     role: 'tool',
                     content: toolResult,
                     name: toolCall.function.name,
                     tool_call_id: toolCall.id
-                });
+                };
+
+                if (isSubAgent) {
+                    localHistory.push(toolMsg);
+                } else {
+                    await memoryStore.addMessage(toolMsg);
+                }
             }
 
             // Continue the loop so LLM can process the tool result
@@ -146,3 +169,6 @@ export async function runAgentLoop(userMessage: string): Promise<string> {
 
     return limitMsg;
 }
+
+// Initialize tool-loop orchestration
+setAgentRunner(runAgentLoop);

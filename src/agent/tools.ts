@@ -13,6 +13,12 @@ import { memoryStore } from '../db/index.js';
 // Type definition for a tool executor
 type ToolExecutor = (args: any) => Promise<string> | string;
 
+// Function pointer to avoid circular dependency with loop.ts
+let agentRunner: ((msg: string, isSub: boolean) => Promise<string>) | null = null;
+export function setAgentRunner(runner: any) {
+  agentRunner = runner;
+}
+
 export interface ToolDefinition {
   type: 'function';
   function: {
@@ -342,6 +348,37 @@ const projectMap: AgentTool = {
   }
 };
 
+// 9. Sub-agent Spawning Tool
+const spawnSubagent: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'spawn_subagent',
+      description: 'Spawn a specialized sub-agent to handle a specific sub-task or research. Use this for complex multi-part tasks.',
+      parameters: {
+        type: 'object',
+        properties: {
+          task: {
+            type: 'string',
+            description: 'The specific task or instruction for the sub-agent.'
+          }
+        },
+        required: ['task']
+      }
+    }
+  },
+  execute: async (args: { task: string }) => {
+    if (!agentRunner) return "Error: Sub-agent engine not initialized.";
+    try {
+      console.log(`🚀 Spawning sub-agent for task: ${args.task}`);
+      const result = await agentRunner(args.task, true);
+      return `### SUB-AGENT REPORT ###\n${result}\n### END OF REPORT ###`;
+    } catch (e: any) {
+      return `Error spawning sub-agent: ${e.message}`;
+    }
+  }
+};
+
 // Combine tools into a map for fast lookup and an array for the LLM
 export const availableTools: AgentTool[] = [
   getSystemInfo,
@@ -351,7 +388,8 @@ export const availableTools: AgentTool[] = [
   readWebpage,
   fileManager,
   searchMemory,
-  projectMap
+  projectMap,
+  spawnSubagent
 ];
 
 export const toolsSchema = availableTools.map(t => t.definition);
