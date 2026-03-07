@@ -8,6 +8,7 @@ import { transcribeAudio, generateSpeech } from '../llm/client.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TMP_DIR = path.join(__dirname, '../../data/tmp');
@@ -30,6 +31,71 @@ async function setupBot() {
     bot.command('clear', async (ctx) => {
         await memoryStore.clearMemory();
         ctx.reply('🧹 Memory cleared. I have forgotten our past conversations.');
+    });
+
+    // --- Google Workspace Setup Commands ---
+
+    bot.command('gsetup1', async (ctx) => {
+        const email = ctx.match;
+        if (!email) {
+            return ctx.reply('❌ Por favor, proporciona tu email de Google. Uso: `/gsetup1 tu@email.com`', { parse_mode: 'Markdown' });
+        }
+
+        const clientSecretPath = path.join(process.cwd(), 'client_secret.json');
+        if (!fs.existsSync(clientSecretPath)) {
+            return ctx.reply('❌ Archivo `client_secret.json` no encontrado en la raíz del proyecto. Por favor, súbelo primero.');
+        }
+
+        // Determine gog binary path
+        let gogPath = 'gog';
+        const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
+        if (fs.existsSync(localBinPath)) {
+            gogPath = `"${localBinPath}"`;
+        }
+
+        try {
+            ctx.reply('⏳ Iniciando proceso de autenticación... configurando credenciales...');
+
+            // Step 0: Set credentials file
+            execSync(`${gogPath} auth credentials "${clientSecretPath}"`, { encoding: 'utf-8' });
+
+            // Step 1: Start remote auth flow
+            const output = execSync(`${gogPath} auth add ${email} --remote --step 1 --services all`, { encoding: 'utf-8' });
+
+            ctx.reply(`✅ **Paso 1 completado.**\n\nPor favor, visita el siguiente enlace, autoriza la aplicación y **copia la URL final** que te dé Google:\n\n\`${output.trim()}\`\n\nLuego, usa el comando:\n\`/gsetup2 ${email} [URL_FINAL]\``, { parse_mode: 'Markdown' });
+        } catch (error: any) {
+            console.error('Error en gsetup1:', error);
+            ctx.reply(`❌ Error: ${error.message}\n\nSTDOUT: ${error.stdout}\nSTDERR: ${error.stderr}`);
+        }
+    });
+
+    bot.command('gsetup2', async (ctx) => {
+        const parts = ctx.match.split(' ');
+        if (parts.length < 2) {
+            return ctx.reply('❌ Uso: `/gsetup2 tu@email.com [URL_CON_TOKEN]`', { parse_mode: 'Markdown' });
+        }
+
+        const email = parts[0];
+        const authUrl = parts[1];
+
+        // Determine gog binary path
+        let gogPath = 'gog';
+        const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
+        if (fs.existsSync(localBinPath)) {
+            gogPath = `"${localBinPath}"`;
+        }
+
+        try {
+            ctx.reply('⏳ Verificando token y finalizando autenticación...');
+
+            // Step 2: Exchange code/URL for token
+            const output = execSync(`${gogPath} auth add ${email} --remote --step 2 --auth-url "${authUrl}"`, { encoding: 'utf-8' });
+
+            ctx.reply(`🎉 **¡Autenticación exitosa!**\nOpenMota ahora tiene acceso a tu cuenta: **${email}**.\n\nYa puedes preguntarme por tus correos, calendario o archivos de Drive.`);
+        } catch (error: any) {
+            console.error('Error en gsetup2:', error);
+            ctx.reply(`❌ Error verificando el token: ${error.message}\n\nSTDERR: ${error.stderr}`);
+        }
     });
 
     // 3. Main message handler

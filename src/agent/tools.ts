@@ -230,11 +230,18 @@ const googleWorkspaceManager: AgentTool = {
   execute: async (args: { subcommand: string, action: string, args?: string[] }) => {
     const { subcommand, action, args: commandArgs = [] } = args;
 
+    // Determine gog binary path
+    let gogPath = 'gog';
+    const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
+    if (fs.existsSync(localBinPath)) {
+      gogPath = `"${localBinPath}"`;
+    }
+
     // Construct the full command
-    const fullCommand = `gog ${subcommand} ${action} ${commandArgs.join(' ')}`;
+    const fullCommand = `${gogPath} ${subcommand} ${action} ${commandArgs.join(' ')}`;
 
     // Safety check - specifically for gog
-    console.log(`📡 Construction Google Workspace command: ${fullCommand}`);
+    console.log(`📡 Constructing Google Workspace command: ${fullCommand}`);
 
     try {
       // Execute with a longer timeout for network-bound operations
@@ -245,10 +252,11 @@ const googleWorkspaceManager: AgentTool = {
       });
       return output.trim() || 'Command executed successfully.';
     } catch (e: any) {
-      if (e.message.includes('not found') || e.message.includes('not recognized')) {
-        return "Error: The 'gog' CLI is not installed or not in the system PATH. Please ensure it is installed and configured.";
+      const errorMsg = e.message || '';
+      if (errorMsg.includes('not found') || errorMsg.includes('not recognized') || errorMsg.includes('ENOENT')) {
+        return "Error: The 'gog' CLI is not installed or not in the system PATH. Please ensure it is installed and configured (check nixpacks.toml for Dokploy or run local install).";
       }
-      return `Error executing Google Workspace command: ${e.message}\nSTDOUT: ${e.stdout}\nSTDERR: ${e.stderr}`;
+      return `Error executing Google Workspace command: ${e.message}\nSTDOUT: ${e.stdout || ''}\nSTDERR: ${e.stderr || ''}`;
     }
   }
 };
