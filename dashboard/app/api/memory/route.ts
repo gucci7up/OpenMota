@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
     try {
-        const apiRes = await fetch('http://localhost:3001/memory', {
+        const backendUrl = process.env.OPENMOTA_BACKEND_URL || 'http://localhost:3001';
+        const apiRes = await fetch(`${backendUrl}/memory`, {
             method: 'GET',
             headers: {
                 'x-api-key': process.env.OPENMOTA_API_KEY || ''
