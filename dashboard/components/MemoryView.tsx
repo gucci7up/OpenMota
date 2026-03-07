@@ -1,24 +1,43 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Search,
     Database,
     Sparkles,
     History,
     Trash2,
-    RefreshCw
+    RefreshCw,
+    Loader2
 } from 'lucide-react';
+
+interface Memory {
+    id: string;
+    content: string;
+    role: string;
+    type: string;
+    timestamp: string;
+}
 
 const MemoryView: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
+    const [memories, setMemories] = useState<Memory[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const memories = [
-        { text: "Implementar autenticación robusta mediante x-api-key en Express.", type: "Conceptual", time: "Hace 2 horas" },
-        { text: "Configurar puerto 3001 para evitar conflictos con el dashboard de Dokploy.", type: "Técnico", time: "Hace 3 horas" },
-        { text: "El usuario prefiere respuestas concisas y evitar el chitchat innecesario.", type: "Preferencia", time: "Ayer" },
-        { text: "Flujo de despliegue en Dokploy configurado con variables de entorno.", type: "Infraestructura", time: "Ayer" },
-    ];
+    const fetchMemories = () => {
+        setLoading(true);
+        fetch('/api/memory')
+            .then(res => res.json())
+            .then(data => {
+                setMemories(data);
+                setLoading(false);
+            })
+            .catch(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchMemories();
+    }, []);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -28,13 +47,12 @@ const MemoryView: React.FC = () => {
                     <p className="text-zinc-500">Explora los conceptos y decisiones grabados en el motor RAG.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-medium hover:bg-zinc-800 transition-colors">
-                        <RefreshCw className="w-3 h-3" />
-                        Re-indexar Memoria
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-red-950/20 border border-red-900/30 rounded-xl text-xs font-medium text-red-400 hover:bg-red-900/20 transition-colors">
-                        <Trash2 className="w-3 h-3" />
-                        Borrar Memoria
+                    <button
+                        onClick={fetchMemories}
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-medium hover:bg-zinc-800 transition-colors"
+                    >
+                        <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+                        Sincronizar
                     </button>
                 </div>
             </div>
@@ -44,13 +62,13 @@ const MemoryView: React.FC = () => {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
                     <input
                         type="text"
-                        placeholder="Realiza una búsqueda semántica (ej: ¿Qué decidimos sobre la seguridad?)"
-                        className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-1 focus:ring-purple-600/50 transition-all"
+                        placeholder="Realiza una búsqueda semántica (Próximamente...)"
+                        className="w-full bg-zinc-950/50 border border-zinc-800 rounded-xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:ring-1 focus:ring-purple-600/50 transition-all cursor-not-allowed"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        readOnly
                     />
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        <span className="text-[10px] bg-purple-600/20 text-purple-400 px-2 py-1 rounded font-mono border border-purple-500/20 uppercase">RAG v2.0</span>
+                        <span className="text-[10px] bg-purple-600/20 text-purple-400 px-2 py-1 rounded font-mono border border-purple-500/20 uppercase">RAG Engine</span>
                     </div>
                 </div>
 
@@ -60,8 +78,8 @@ const MemoryView: React.FC = () => {
                             <Database className="w-5 h-5 text-indigo-400" />
                         </div>
                         <div>
-                            <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Vectores Almacenados</p>
-                            <p className="text-xl font-bold">4,821</p>
+                            <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Vectores Activos</p>
+                            <p className="text-xl font-bold">{memories.length}</p>
                         </div>
                     </div>
                     <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 flex items-center gap-4">
@@ -69,8 +87,10 @@ const MemoryView: React.FC = () => {
                             <Sparkles className="w-5 h-5 text-amber-400" />
                         </div>
                         <div>
-                            <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Precisión Semántica</p>
-                            <p className="text-xl font-bold">98.4%</p>
+                            <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Último Aprendizaje</p>
+                            <p className="text-xl font-bold text-zinc-400 text-sm truncate max-w-[150px]">
+                                {memories[0]?.content || 'Iniciando...'}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -79,26 +99,35 @@ const MemoryView: React.FC = () => {
             <div className="space-y-4">
                 <h3 className="font-semibold flex items-center gap-2 ml-1">
                     <History className="w-4 h-4 text-purple-400" />
-                    Conceptos Recientes
+                    Conceptos y Mensajes en Memoria
                 </h3>
-                <div className="grid grid-cols-1 gap-3">
-                    {memories.map((memory, i) => (
-                        <div key={i} className="glass p-5 rounded-2xl hover:bg-zinc-900/40 transition-all border-l-2 border-l-purple-600Group flex items-center justify-between group">
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 uppercase tracking-tighter">
-                                        {memory.type}
-                                    </span>
-                                    <span className="text-[10px] text-zinc-600 font-medium">Recorded: {memory.time}</span>
+                {loading ? (
+                    <div className="flex justify-center p-20">
+                        <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                        {memories.map((memory, i) => (
+                            <div key={memory.id} className="glass p-5 rounded-2xl hover:bg-zinc-900/40 transition-all border-l-2 border-l-purple-600 flex items-center justify-between group">
+                                <div className="space-y-2 flex-1">
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tighter ${memory.role === 'user' ? 'bg-zinc-800 text-zinc-400' : 'bg-purple-900/20 text-purple-400'
+                                            }`}>
+                                            {memory.role} • {memory.type}
+                                        </span>
+                                        <span className="text-[10px] text-zinc-600 font-medium">{memory.timestamp}</span>
+                                    </div>
+                                    <p className="text-sm text-zinc-200 line-clamp-2">{memory.content}</p>
                                 </div>
-                                <p className="text-sm text-zinc-200">{memory.text}</p>
                             </div>
-                            <button className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                        {memories.length === 0 && (
+                            <div className="text-center p-10 text-zinc-600 text-sm italic">
+                                No hay recuerdos grabados aún.
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

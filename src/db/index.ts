@@ -205,5 +205,48 @@ export const memoryStore = {
       console.error('Error in semantic search:', error);
       return [];
     }
+  },
+
+  async getMemoryStats() {
+    try {
+      const snapshot = await messagesCollection.count().get();
+      const totalMessages = snapshot.data().count;
+
+      // For users, we can count unique name fields or just return a static count from allowed IDs
+      const totalUsers = config.TELEGRAM_ALLOWED_USER_IDS.split(',').length;
+
+      return {
+        totalMessages,
+        totalUsers,
+        status: 'online',
+        security: '100% (om-secure)'
+      };
+    } catch (error) {
+      console.error('Error getting memory stats:', error);
+      return { totalMessages: 0, totalUsers: 0, status: 'error' };
+    }
+  },
+
+  async getMemories(limit: number = 20) {
+    try {
+      const snapshot = await messagesCollection
+        .orderBy('timestamp', 'desc')
+        .limit(limit)
+        .get();
+
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          content: data.content,
+          role: data.role,
+          type: data.embedding ? 'Semántica' : 'Texto',
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : 'Reciente'
+        };
+      });
+    } catch (error) {
+      console.error('Error getting memories:', error);
+      return [];
+    }
   }
 };

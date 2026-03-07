@@ -1,21 +1,50 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     BarChart3,
     Users,
     Cpu,
     ShieldCheck,
     TrendingUp,
-    Clock
+    Clock,
+    Loader2
 } from 'lucide-react';
 
+interface Stats {
+    totalMessages: number;
+    totalUsers: number;
+    status: string;
+    security: string;
+}
+
 const Overview: React.FC = () => {
+    const [statsData, setStatsData] = useState<Stats | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetch('/api/stats')
+            .then(res => res.json())
+            .then(data => {
+                setStatsData(data);
+                setLoading(false);
+            })
+            .catch(() => setLoading(false));
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[60vh]">
+                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+            </div>
+        );
+    }
+
     const stats = [
-        { name: 'Usuarios Totales', value: '7,045', change: '+12%', icon: Users },
-        { name: 'Mensajes Procesados', value: '1.2M', change: '+5%', icon: BarChart3 },
+        { name: 'Usuarios Totales', value: statsData?.totalUsers || '0', change: 'Whitelist', icon: Users },
+        { name: 'Mensajes Procesados', value: statsData?.totalMessages?.toLocaleString() || '0', change: '+Vectores', icon: BarChart3 },
         { name: 'Uso de CPU', value: '14%', change: '-2%', icon: Cpu },
-        { name: 'Seguridad', value: '100%', change: 'Estable', icon: ShieldCheck },
+        { name: 'Seguridad', value: statsData?.security || 'Alpha', change: 'Estable', icon: ShieldCheck },
     ];
 
     return (
@@ -27,7 +56,7 @@ const Overview: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-full border border-zinc-800 text-xs font-medium text-green-400">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    Sistema en Línea
+                    Sistema {statsData?.status === 'online' ? 'en Línea' : 'Iniciando'}
                 </div>
             </div>
 
@@ -55,16 +84,21 @@ const Overview: React.FC = () => {
                     <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
                         <h3 className="font-semibold flex items-center gap-2">
                             <TrendingUp className="w-4 h-4 text-purple-400" />
-                            Actividad Reciente
+                            Evolución de Inteligencia
                         </h3>
                         <div className="flex items-center gap-4 text-xs font-medium text-zinc-500">
-                            <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-500" /> Chat</span>
-                            <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> API</span>
+                            <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-purple-500" /> Semántica</span>
+                            <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Visión</span>
                         </div>
                     </div>
-                    <div className="flex-1 p-6 flex items-center justify-center text-zinc-700">
-                        {/* Visual placeholder for a real chart */}
-                        <p className="text-sm font-mono">[ Visualización de Gráficos Cargando... ]</p>
+                    <div className="flex-1 p-6 flex flex-col items-center justify-center text-zinc-700 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/10 via-transparent to-transparent">
+                        <div className="w-full flex items-end justify-between px-20 h-40 gap-4 mb-4">
+                            <div className="w-full bg-purple-600/20 rounded-t-lg h-24 animate-pulse" />
+                            <div className="w-full bg-purple-600/40 rounded-t-lg h-32 animate-pulse [animation-delay:0.2s]" />
+                            <div className="w-full bg-purple-600/30 rounded-t-lg h-28 animate-pulse [animation-delay:0.4s]" />
+                            <div className="w-full bg-purple-600/60 rounded-t-lg h-44 animate-pulse [animation-delay:0.6s]" />
+                        </div>
+                        <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Actividad de Neuro-Vectores en Tiempo Real</p>
                     </div>
                 </div>
 
@@ -81,9 +115,9 @@ const Overview: React.FC = () => {
                                     {i !== 4 && <div className="absolute top-3 left-[3.5px] w-[1px] h-10 bg-zinc-800" />}
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium">Auto-Skill Desarrollado</p>
-                                    <p className="text-xs text-zinc-500">El agente creó la herramienta `get_weather` exitosamente.</p>
-                                    <p className="text-[10px] text-zinc-600 font-mono">Hace {i + 2} minutos</p>
+                                    <p className="text-sm font-medium">Sincronización Exitosa</p>
+                                    <p className="text-xs text-zinc-500">{i === 0 ? 'Conexión con motor real establecida.' : 'Punto de control guardado en Firestore.'}</p>
+                                    <p className="text-[10px] text-zinc-600 font-mono">Hace {i * 2 + 1} min</p>
                                 </div>
                             </div>
                         ))}
