@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import os from 'os';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -25,6 +26,11 @@ if (!_env.success) {
 }
 
 export const config = _env.data;
+
+console.log('✅ Environment Loaded:');
+console.log(` - Bot Token: ${config.TELEGRAM_BOT_TOKEN ? 'OK' : 'MISSING'}`);
+console.log(` - 11Labs Key: ${config.ELEVENLABS_API_KEY ? 'OK' : 'MISSING (Check Dokploy settings)'}`);
+console.log(` - Hostname: ${os.hostname()}`);
 
 export const allowedUserIds = config.TELEGRAM_ALLOWED_USER_IDS.split(',')
     .map(id => id.trim())

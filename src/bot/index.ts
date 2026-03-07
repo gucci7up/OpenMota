@@ -1,4 +1,5 @@
 import { Bot, InputFile } from 'grammy';
+import os from 'os';
 import { config } from '../config.js';
 import { whitelistMiddleware } from './middleware.js';
 import { runAgentLoop } from '../agent/loop.js';
@@ -34,7 +35,7 @@ async function setupBot() {
     // Diagnostic command to check the environment running the bot
     bot.command('envcheck', async (ctx) => {
         const hasElevenLabs = !!config.ELEVENLABS_API_KEY || !!process.env.ELEVENLABS_API_KEY;
-        const hostName = require('os').hostname();
+        const hostName = os.hostname();
         await ctx.reply(`🔍 **Env Check**\n- Host: \`${hostName}\`\n- 11Labs Key Loaded: \`${hasElevenLabs}\``, { parse_mode: 'Markdown' });
     });
 
