@@ -67,6 +67,12 @@ async function setupBot() {
             if (fs.existsSync(localBinPath)) {
                 gogPath = `"${localBinPath}"`;
             }
+        } else {
+            // Linux/Dokploy logic
+            const localBinPath = path.join(process.cwd(), 'bin', 'gog');
+            if (fs.existsSync(localBinPath)) {
+                gogPath = `"${localBinPath}"`;
+            }
         }
 
         try {
@@ -98,6 +104,12 @@ async function setupBot() {
         let gogPath = 'gog';
         if (process.platform === 'win32') {
             const localBinPath = path.join(process.cwd(), 'bin', 'gog.exe');
+            if (fs.existsSync(localBinPath)) {
+                gogPath = `"${localBinPath}"`;
+            }
+        } else {
+            // Linux/Dokploy logic
+            const localBinPath = path.join(process.cwd(), 'bin', 'gog');
             if (fs.existsSync(localBinPath)) {
                 gogPath = `"${localBinPath}"`;
             }
