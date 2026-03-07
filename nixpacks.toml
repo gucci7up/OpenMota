@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm", "curl", "ca-certificates"]
+
+[phases.install]
+cmds = [
+  "npm ci",
+  "curl -L https://github.com/steipete/gogcli/releases/latest/download/gogcli_linux_amd64.tar.gz | tar xz -C /usr/local/bin gog",
+  "chmod +x /usr/local/bin/gog"
+]
+
+[start]
+cmd = "npm run start"
