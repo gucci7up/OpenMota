@@ -9,7 +9,8 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "postinstall": "npx playwright install chromium"
   },
   "keywords": [],
   "author": "",

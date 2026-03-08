@@ -1,13 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "curl"]
+nixPkgs = ["nodejs", "npm", "playwright-driver"]
 
 [phases.install]
-cmds = [
-  "npm ci",
-  "mkdir -p bin",
-  "curl -L https://github.com/steipete/gogcli/releases/download/v0.11.0/gogcli_0.11.0_linux_amd64.tar.gz | tar xz -C bin gog",
-  "chmod +x bin/gog"
-]
-
-[start]
-cmd = "npm run start"
+cmds = ["npm install", "npx playwright install chromium"]
