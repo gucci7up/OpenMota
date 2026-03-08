@@ -3,6 +3,7 @@ import { AgentTool } from '../tools.js';
 
 const playwrightBrowser: AgentTool = {
     definition: {
+        type: 'function',
         function: {
             name: 'playwright_browser',
             description: 'Advanced browser automation tool. Can browse, click, type, and extract data from any website.',
