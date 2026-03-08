@@ -20,6 +20,7 @@ const envSchema = z.object({
     PORT: z.string().default('3001').transform(Number),
     OPENMOTA_API_KEY: z.string().min(10, 'OPENMOTA_API_KEY must be at least 10 characters'),
     TZ: z.string().default('America/Santo_Domingo'),
+    GEMINI_API_KEY: z.string().optional(),
 });
 
 const _env = envSchema.safeParse(process.env);

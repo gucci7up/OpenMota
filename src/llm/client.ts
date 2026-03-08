@@ -1,17 +1,52 @@
 import Groq from 'groq-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config.js';
 import fs from 'fs';
 
 export const groq = new Groq({ apiKey: config.GROQ_API_KEY });
+const genAI = config.GEMINI_API_KEY ? new GoogleGenerativeAI(config.GEMINI_API_KEY) : null;
+
+/**
+ * Helper to call Gemini (Native)
+ */
+async function geminiChatCompletion(messages: any[], tools: any[] = []) {
+    if (!genAI) throw new Error("GEMINI_API_KEY not configured");
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    // Convert messages to Gemini format
+    const contents = messages.map(m => {
+        let parts: any[] = [{ text: m.content || '' }];
+
+        if (m.image_url) {
+            // Note: Native Gemini SDK needs base64 or file data for images if used directly, 
+            // but here we might prefer OpenRouter for vision if we only have URLs.
+            // For now, let's stick to text for the native fallback or assume OpenRouter takes vision.
+        }
+
+        return { role: m.role === 'assistant' ? 'model' : 'user', parts };
+    });
+
+    // Gemini doesn't follow the exact same tool schema as OpenAI/Groq in the simple SDK,
+    // so for tool-enabled complex tasks, OpenRouter or Groq are better.
+    // However, we can implement basic chat fallback here.
+
+    const result = await model.generateContent({
+        contents: contents as any,
+    });
+
+    const response = await result.response;
+    return {
+        role: 'assistant',
+        content: response.text()
+    };
+}
 
 /**
  * Helper to call OpenRouter for both text and vision
  */
 async function openRouterChatCompletion(messages: any[], tools: any[] = [], model: string = 'google/gemini-2.0-flash-001') {
-    const hasImage = messages.some(m => m.image_url);
-
     const openRouterMessages = messages.map(m => {
-        // If it's a tool result or tool call, format as standard chat
         if (m.role === 'tool') {
             return { role: 'tool', content: m.content, tool_call_id: m.tool_call_id };
         }
@@ -20,7 +55,6 @@ async function openRouterChatCompletion(messages: any[], tools: any[] = [], mode
             return { role: 'assistant', content: m.content || '', tool_calls: m.tool_calls };
         }
 
-        // For user/system, handle potential images
         if (m.image_url) {
             const content: any[] = [{ type: 'text', text: m.content || '' }];
             content.push({
@@ -50,7 +84,7 @@ async function openRouterChatCompletion(messages: any[], tools: any[] = [], mode
         headers: {
             'Authorization': `Bearer ${config.OPENROUTER_API_KEY}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://openmota.com', // Optional but recommended for OpenRouter
+            'HTTP-Referer': 'https://openmota.com',
             'X-Title': 'OpenMota Agent'
         },
         body: JSON.stringify(body)
@@ -66,18 +100,18 @@ async function openRouterChatCompletion(messages: any[], tools: any[] = [], mode
 }
 
 /**
- * Main chat completion function with automatic fallback
+ * Main chat completion function with 3-tier fallback
  */
 export const chatCompletion = async (messages: any[], tools: any[] = []) => {
     const hasImage = messages.some(m => m.image_url);
 
-    // 1. Vision ALWAYS uses OpenRouter
+    // 1. Vision ALWAYS uses OpenRouter (Gemini Flash)
     if (hasImage) {
-        console.log("📸 Vision detected, calling OpenRouter...");
+        console.log("📸 Vision detected, calling OpenRouter (Gemini)...");
         return openRouterChatCompletion(messages, tools, 'google/gemini-2.0-flash-001');
     }
 
-    // 2. Try Groq (Llama 3.3 70B) for text-only
+    // 2. Try Groq (Primary Text)
     try {
         console.log("⚡ Calling Groq (Primary)...");
         const params: any = {
@@ -102,14 +136,24 @@ export const chatCompletion = async (messages: any[], tools: any[] = []) => {
         return completion.choices[0].message;
 
     } catch (error: any) {
-        // 3. Fallback to OpenRouter if Groq fails (Rate limit or other)
-        console.warn(`⚠️ Groq failed (Status: ${error.status || 'unknown'}). Falling back to OpenRouter...`);
+        console.warn(`⚠️ Groq failed (Status: ${error.status || 'unknown'}). Trying Gemini Native Fallback...`);
 
+        // 3. Try Gemini Native Fallback (Secondary)
+        if (config.GEMINI_API_KEY && tools.length === 0) {
+            try {
+                console.log("♊ Calling Gemini Native...");
+                return await geminiChatCompletion(messages);
+            } catch (geminiError) {
+                console.warn("⚠️ Gemini Native failed, trying OpenRouter as last resort...");
+            }
+        }
+
+        // 4. Try OpenRouter (Final Resort)
         try {
-            // Using a reliable model in OpenRouter as fallback
+            console.log("🌐 Calling OpenRouter (Final Fallback)...");
             return await openRouterChatCompletion(messages, tools, 'meta-llama/llama-3.3-70b-instruct');
         } catch (orError: any) {
-            console.error('❌ Both Groq and OpenRouter failed:', orError);
+            console.error('❌ All AI providers failed:', orError);
             throw orError;
         }
     }
@@ -117,10 +161,7 @@ export const chatCompletion = async (messages: any[], tools: any[] = []) => {
 
 export const getEmbeddings = async (text: string): Promise<number[]> => {
     const apiKey = config.OPENROUTER_API_KEY;
-    if (!apiKey) {
-        console.warn('OPENROUTER_API_KEY not found, semantic memory will be disabled.');
-        return [];
-    }
+    if (!apiKey) return [];
 
     try {
         const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
@@ -131,14 +172,11 @@ export const getEmbeddings = async (text: string): Promise<number[]> => {
             },
             body: JSON.stringify({
                 model: 'openai/text-embedding-3-small',
-                input: text.substring(0, 8000) // Truncate to avoid limits
+                input: text.substring(0, 8000)
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`OpenRouter Embedding Error: ${response.status}`);
-        }
-
+        if (!response.ok) throw new Error(`OpenRouter Embedding Error: ${response.status}`);
         const data = await response.json();
         return data.data[0].embedding;
     } catch (error) {
@@ -163,9 +201,7 @@ export const transcribeAudio = async (filePath: string) => {
 
 export const generateSpeech = async (text: string): Promise<Buffer> => {
     const apiKey = config.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY;
-    if (!apiKey || apiKey.trim() === '') {
-        throw new Error("ELEVENLABS_API_KEY is not configured.");
-    }
+    if (!apiKey || apiKey.trim() === '') throw new Error("ELEVENLABS_API_KEY limited");
 
     const VOICE_ID = 'pNInz6obpgDQGcFmaJgB';
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`;
@@ -179,17 +215,11 @@ export const generateSpeech = async (text: string): Promise<Buffer> => {
         body: JSON.stringify({
             text: text,
             model_id: 'eleven_multilingual_v2',
-            voice_settings: {
-                stability: 0.5,
-                similarity_boost: 0.75
-            }
+            voice_settings: { stability: 0.5, similarity_boost: 0.75 }
         })
     });
 
-    if (!response.ok) {
-        throw new Error(`ElevenLabs API Error: ${response.status} ${response.statusText}`);
-    }
-
+    if (!response.ok) throw new Error(`ElevenLabs API Error: ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
 };
