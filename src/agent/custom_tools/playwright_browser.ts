@@ -17,7 +17,7 @@ const playwrightBrowser: AgentTool = {
                     },
                     url: {
                         type: 'string',
-                        description: 'URL to navigate to (required for navigate).'
+                        description: 'URL to navigate to (REQUIRED for most actions including navigate, extract_text, and screenshot).'
                     },
                     selector: {
                         type: 'string',
@@ -36,27 +36,33 @@ const playwrightBrowser: AgentTool = {
         const { action, url, selector, text } = args;
         let browser;
         try {
-            browser = await chromium.launch({ headless: true });
+            browser = await chromium.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
             const context = await browser.newContext();
             const page = await context.newPage();
 
+            // Set a default timeout of 60s
+            page.setDefaultTimeout(60000);
+
             if (action === 'navigate') {
                 if (!url) return 'Error: URL is required for navigate action.';
-                await page.goto(url, { waitUntil: 'networkidle' });
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
                 const title = await page.title();
                 return `Successfully navigated to ${url}. Page title: "${title}"`;
             }
 
             if (action === 'extract_text') {
                 if (!url) return 'Error: URL is required for extract_text action.';
-                await page.goto(url, { waitUntil: 'networkidle' });
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
                 const content = await page.evaluate(() => document.body.innerText);
                 return content.substring(0, 5000) + (content.length > 5000 ? '...' : '');
             }
 
             if (action === 'screenshot') {
                 if (!url) return 'Error: URL is required for screenshot action.';
-                await page.goto(url, { waitUntil: 'networkidle' });
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
                 // For now, we just confirm we can do it. In a real scenario we'd save to a path.
                 return `Screenshot capability verified for ${url}.`;
             }
