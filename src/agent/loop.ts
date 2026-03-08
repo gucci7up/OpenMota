@@ -165,5 +165,70 @@ export async function runAgentLoop(userMessage: string, isSubAgent: boolean = fa
     return limitMsg;
 }
 
+/**
+ * Autonomous Heartbeat Loop (OpenClaw Parity)
+ * Triggered by a timer to perform background tasks.
+ */
+export async function runAutonomousHeartbeat(): Promise<void> {
+    console.log("💓 Heartbeat triggered...");
+
+    // 1. Get recent context
+    const history = await memoryStore.getRecentMessages(10);
+
+    // 2. Prepare autonomous instruction
+    const autonomousInstruction = `[SYSTEM HEARTBEAT]
+It is now ${new Date().toLocaleString()}. 
+Review your recent activity and perform any necessary autonomous actions:
+- Check for pending tasks.
+- Research topics mentioned in the last conversation if not finished.
+- Perform system maintenance or workspace optimizations.
+- If nothing is needed, simply respond with "IDLE".`;
+
+    // 3. Run a mini-loop (max 3 iterations to save tokens)
+    let iterations = 0;
+    const MAX_HB_ITERATIONS = 3;
+    const localHistory: Message[] = [...history, { role: 'user', content: autonomousInstruction }];
+
+    while (iterations < MAX_HB_ITERATIONS) {
+        iterations++;
+        console.log(`💓 HB thinking... (${iterations}/${MAX_HB_ITERATIONS})`);
+
+        const skillsContent = await loadSkills();
+        const fullSystemPrompt = SYSTEM_PROMPT + skillsContent;
+        const messages = [
+            { role: 'system', content: fullSystemPrompt },
+            ...localHistory
+        ];
+
+        await loadCustomTools();
+        const responseMessage = await chatCompletion(messages, getToolsSchema());
+
+        if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+            for (const toolCall of responseMessage.tool_calls) {
+                const toolResult = await executeTool(toolCall.function.name, toolCall.function.arguments);
+                localHistory.push({ role: 'assistant', content: '', tool_calls: [toolCall] } as any);
+                localHistory.push({ role: 'tool', content: toolResult, name: toolCall.function.name, tool_call_id: toolCall.id } as any);
+            }
+            continue;
+        }
+
+        if (responseMessage.content) {
+            const content = responseMessage.content as string;
+            if (content.toUpperCase().includes("IDLE")) {
+                console.log("💓 HB: No actions needed (IDLE).");
+            } else {
+                console.log(`💓 HB Action: ${content}`);
+                // We save the heartbeat's "thought" to memory so the user knows what happened in the background
+                await memoryStore.addMessage({
+                    role: 'assistant',
+                    content: `[HEARTBEAT LOG]: ${content}`
+                });
+            }
+            break;
+        }
+        break;
+    }
+}
+
 // Initialize tool-loop orchestration
 setAgentRunner(runAgentLoop);

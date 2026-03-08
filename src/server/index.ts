@@ -1,6 +1,6 @@
 import express from 'express';
 import { config } from '../config.js';
-import { runAgentLoop } from '../agent/loop.js';
+import { runAgentLoop, runAutonomousHeartbeat } from '../agent/loop.js';
 import { memoryStore } from '../db/index.js';
 import { availableTools, loadCustomTools } from '../agent/tools.js';
 
@@ -79,5 +79,15 @@ export function startServer() {
     app.listen(port, '0.0.0.0', () => {
         console.log(`📡 OpenMota API Server running at http://0.0.0.0:${port}`);
         console.log(`🔑 Secure access enabled with x-api-key`);
+
+        // Start Autonomous Heartbeat (every 30 minutes)
+        console.log(`💓 Autonomous Heartbeat active (Interval: 30m)`);
+        setInterval(async () => {
+            try {
+                await runAutonomousHeartbeat();
+            } catch (err) {
+                console.error("❌ Heartbeat Error:", err);
+            }
+        }, 30 * 60 * 1000);
     });
 }
