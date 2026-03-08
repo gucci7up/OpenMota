@@ -27,6 +27,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         { id: 'settings', name: 'Configuración', icon: Settings },
     ];
 
+    const handleLogout = async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/login';
+    };
+
     return (
         <aside className="w-64 h-screen bg-[#09090b] border-r border-[#27272a] flex flex-col fixed left-0 top-0 z-50">
             <div className="p-6">
@@ -46,8 +51,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-200 ${activeTab === item.id
-                                    ? 'bg-purple-600/10 text-purple-400 font-medium'
-                                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                                ? 'bg-purple-600/10 text-purple-400 font-medium'
+                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
                                 }`}
                         >
                             <item.icon className="w-5 h-5" />
@@ -67,7 +72,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                         <p className="text-[10px] text-zinc-500 truncate">Gucci7up</p>
                     </div>
                 </div>
-                <button className="w-full flex items-center gap-3 px-4 py-2 text-zinc-500 hover:text-red-400 text-sm transition-colors">
+                <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-zinc-500 hover:text-red-400 text-sm transition-colors"
+                >
                     <LogOut className="w-4 h-4" />
                     Cerrar Sesión
                 </button>
