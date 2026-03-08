@@ -23,6 +23,7 @@
     "grammy": "^1.41.1",
     "groq-sdk": "^0.37.0",
     "jsdom": "^28.1.0",
+    "playwright": "^1.58.2",
     "tsx": "^4.21.0",
     "turndown": "^7.2.2",
     "typescript": "^5.9.3",
