@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs", "playwright-driver", "glib", "nss", "nspr", "atk", "at-spi2-atk", "libdrm", "dbus", "libxcb", "libXcomposite", "libXdamage", "libXext", "libXfixes", "libXrandr", "libgbm", "pango", "cairo", "alsa-lib"]
+nixPkgs = ["nodejs", "playwright-driver", "glib", "nss", "nspr", "atk", "at-spi2-atk", "libdrm", "dbus", "libxcb", "libx11", "libxcomposite", "libxdamage", "libxext", "libxfixes", "libxrandr", "libxkbcommon", "mesa", "pango", "cairo", "alsa-lib"]
 
 [phases.install]
 cmds = ["npm install", "npx playwright install chromium"]
