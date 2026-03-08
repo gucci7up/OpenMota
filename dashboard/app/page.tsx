@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import Overview from '@/components/Overview';
 import ChatView from '@/components/ChatView';
 import MemoryView from '@/components/MemoryView';
+import SkillsView from '@/components/SkillsView';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -18,15 +19,7 @@ export default function Home() {
       case 'memory':
         return <MemoryView />;
       case 'skills':
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 space-y-4">
-            <div className="w-16 h-16 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center">
-              <span className="text-2xl">⚡</span>
-            </div>
-            <h3 className="text-xl font-semibold text-zinc-300">Auto-Skills Engine</h3>
-            <p className="max-w-md text-center text-sm">Visualización de habilidades programadas dinámicamente en desarrollo para v1.1.</p>
-          </div>
-        );
+        return <SkillsView />;
       case 'logs':
         return (
           <div className="glass rounded-2xl p-6 h-[70vh] font-mono text-sm overflow-hidden flex flex-col">

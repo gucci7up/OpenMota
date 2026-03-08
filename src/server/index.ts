@@ -2,6 +2,7 @@ import express from 'express';
 import { config } from '../config.js';
 import { runAgentLoop } from '../agent/loop.js';
 import { memoryStore } from '../db/index.js';
+import { availableTools, loadCustomTools } from '../agent/tools.js';
 
 const app = express();
 app.use(express.json());
@@ -56,6 +57,20 @@ app.get('/memory', authMiddleware, async (req, res) => {
         res.json(memories);
     } catch (error: any) {
         res.status(500).json({ error: 'Failed to fetch memories' });
+    }
+});
+
+// Skills Endpoint
+app.get('/skills', authMiddleware, async (req, res) => {
+    try {
+        await loadCustomTools();
+        const skills = availableTools.map(t => ({
+            name: t.definition.function.name,
+            description: t.definition.function.description,
+        }));
+        res.json(skills);
+    } catch (error: any) {
+        res.status(500).json({ error: 'Failed to fetch skills' });
     }
 });
 
