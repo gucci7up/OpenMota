@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.git
+.nixpacks
+nixpacks.toml
+dashboard
+*.log
+.gemini
+tmp
