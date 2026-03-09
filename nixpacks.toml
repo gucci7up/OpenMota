@@ -1,0 +1,9 @@
+# Force Nixpacks to always do a fresh build
+[variables]
+NODE_ENV = "production"
+
+[phases.build]
+cmds = ["npm install"]
+
+[start]
+cmd = "npx tsx src/index.ts"
