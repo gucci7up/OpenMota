@@ -44,8 +44,45 @@ async function setupBot() {
         ctx.replyWithChatAction('typing');
 
         try {
+            // ── Speedtest shortcut: bypass the LLM, run tool directly ──
+            const speedtestKeywords = ['speedtest', 'speed test', 'speed-test', 'run_speedtest',
+                'velocidad de internet', 'velocidad internet', 'test de velocidad',
+                'prueba de velocidad', 'medir velocidad', 'velocidad de red',
+                'que velocidad', 'qué velocidad', 'cuanta velocidad', 'cuánta velocidad'];
+            const lowerText = text.toLowerCase();
+            const isSpeedtestRequest = speedtestKeywords.some(kw => lowerText.includes(kw));
+
+            if (isSpeedtestRequest) {
+                console.log('🌐 Speedtest keyword detected — executing tool directly...');
+                ctx.replyWithChatAction('typing');
+                const { availableTools, loadCustomTools } = await import('../agent/tools.js');
+                await loadCustomTools();
+                const speedtestTool = availableTools.find(t => t.definition.function.name === 'run_speedtest');
+                if (speedtestTool) {
+                    const rawResult = await speedtestTool.execute({});
+                    let reply = '🌐 *Resultado del Speedtest:*\n\n';
+                    try {
+                        const data = JSON.parse(rawResult);
+                        if (data.status === 'success') {
+                            reply += `📥 *Descarga:* ${data.download}\n`;
+                            reply += `📤 *Subida:* ${data.upload}\n`;
+                            reply += `📡 *Ping:* ${data.ping}\n`;
+                            reply += `📍 *Servidor:* ${data.server} (${data.location})`;
+                        } else {
+                            reply = rawResult;
+                        }
+                    } catch {
+                        reply = rawResult;
+                    }
+                    await ctx.reply(reply, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
+                    return;
+                }
+            }
+            // ── End speedtest shortcut ──
+
             // Pass the text to the agent loop
             let response = await runAgentLoop(text);
+
 
             // Handle Voice Synthesis if agent used <VOICE> tags
             if (response.includes('<VOICE>') && response.includes('</VOICE>')) {
