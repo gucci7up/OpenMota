@@ -443,6 +443,33 @@ const developTool: AgentTool = {
   }
 };
 
+// 11. Speedtest Tool (Static)
+const runSpeedtest: AgentTool = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'run_speedtest',
+      description: 'Run an internet speed test using speedtest-cli and return JSON results (download, upload, ping).',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: []
+      }
+    }
+  },
+  execute: async () => {
+    try {
+      console.log('🌐 Executing speedtest-cli...');
+      const { execSync } = await import('child_process');
+      const output = execSync('speedtest-cli --json', { encoding: 'utf-8', timeout: 60000 });
+      return output;
+    } catch (e: any) {
+      console.error('Speedtest error:', e);
+      return `Error: ${e.message}. Ensure speedtest-cli is installed in the container.`;
+    }
+  }
+};
+
 // Combine tools into a map for fast lookup and an array for the LLM
 export const availableTools: AgentTool[] = [
   getSystemInfo,
@@ -455,7 +482,8 @@ export const availableTools: AgentTool[] = [
   semanticSearch,
   projectMap,
   spawnSubagent,
-  developTool
+  developTool,
+  runSpeedtest
 ];
 
 /**
