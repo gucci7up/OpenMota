@@ -469,10 +469,13 @@ export async function loadCustomTools() {
     const files = fs.readdirSync(toolDir).filter(f => f.endsWith('.ts') || f.endsWith('.js'));
     for (const file of files) {
       // Use dynamic import to load the tool
+      console.log(`📂 Loading custom tool: ${file}`);
       const toolModule = await import(`./custom_tools/${file}?cache=${Date.now()}`);
       if (toolModule.default) {
+        const toolName = toolModule.default.definition.function.name;
         // Only add if not already there
-        if (!availableTools.find(t => t.definition.function.name === toolModule.default.definition.function.name)) {
+        if (!availableTools.find(t => t.definition.function.name === toolName)) {
+          console.log(`✅ Loaded custom tool: ${toolName}`);
           availableTools.push(toolModule.default);
         }
       }
