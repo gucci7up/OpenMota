@@ -459,15 +459,31 @@ const runSpeedtest: AgentTool = {
   },
   execute: async () => {
     try {
-      console.log('🌐 Executing speedtest-cli...');
+      console.log('🌐 Executing Ookla speedtest...');
       const { execSync } = await import('child_process');
-      const output = execSync('speedtest-cli --json', { encoding: 'utf-8', timeout: 60000 });
-      return output;
+      const output = execSync('speedtest --format=json --accept-license --accept-gdpr', {
+        encoding: 'utf-8',
+        timeout: 60000
+      });
+      const data = JSON.parse(output);
+      const downloadMbps = (data.download.bandwidth * 8 / 1000000).toFixed(2);
+      const uploadMbps = (data.upload.bandwidth * 8 / 1000000).toFixed(2);
+      const ping = data.ping.latency.toFixed(2);
+      return JSON.stringify({
+        status: 'success',
+        download: `${downloadMbps} Mbit/s`,
+        upload: `${uploadMbps} Mbit/s`,
+        ping: `${ping} ms`,
+        server: data.server.name,
+        location: `${data.server.location}, ${data.server.country}`,
+        timestamp: data.timestamp
+      }, null, 2);
     } catch (e: any) {
       console.error('Speedtest error:', e);
-      return `Error: ${e.message}. Ensure speedtest-cli is installed in the container.`;
+      return `Error ejecutando speedtest: ${e.message}`;
     }
   }
+
 };
 
 // Combine tools into a map for fast lookup and an array for the LLM
