@@ -7,7 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including playwright)
+# Install dependencies (including playwright and speedtest-cli)
+RUN apt-get update && apt-get install -y speedtest-cli && rm -rf /var/lib/apt/lists/*
 RUN npm install
 
 # Copy the rest of the application
