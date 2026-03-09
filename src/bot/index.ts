@@ -53,31 +53,45 @@ async function setupBot() {
             const isSpeedtestRequest = speedtestKeywords.some(kw => lowerText.includes(kw));
 
             if (isSpeedtestRequest) {
-                console.log('🌐 Speedtest keyword detected — executing tool directly...');
+                console.log('🌐 Speedtest keyword detected — running HTTP speedtest inline...');
                 ctx.replyWithChatAction('typing');
-                const { availableTools, loadCustomTools } = await import('../agent/tools.js');
-                await loadCustomTools();
-                const speedtestTool = availableTools.find(t => t.definition.function.name === 'run_speedtest');
-                if (speedtestTool) {
-                    const rawResult = await speedtestTool.execute({});
-                    let reply = '🌐 *Resultado del Speedtest:*\n\n';
-                    try {
-                        const data = JSON.parse(rawResult);
-                        if (data.status === 'success') {
-                            reply += `📥 *Descarga:* ${data.download}\n`;
-                            reply += `📤 *Subida:* ${data.upload}\n`;
-                            reply += `📡 *Ping:* ${data.ping}\n`;
-                            reply += `📍 *Servidor:* ${data.server} (${data.location})`;
-                        } else {
-                            reply = rawResult;
-                        }
-                    } catch {
-                        reply = rawResult;
-                    }
+                try {
+                    // Ping
+                    const pingStart = Date.now();
+                    await fetch('https://1.1.1.1', { method: 'HEAD' }).catch(() => {});
+                    const pingMs = Date.now() - pingStart;
+
+                    // Download 25MB from Cloudflare
+                    const dlStart = Date.now();
+                    const dlRes = await fetch('https://speed.cloudflare.com/__down?bytes=25000000');
+                    if (!dlRes.ok) throw new Error(`Download falló: HTTP ${dlRes.status}`);
+                    const dlBuffer = await dlRes.arrayBuffer();
+                    const dlTime = (Date.now() - dlStart) / 1000;
+                    const dlMbps = ((dlBuffer.byteLength * 8) / dlTime / 1_000_000).toFixed(2);
+
+                    // Upload 5MB to Cloudflare
+                    const uploadData = new Uint8Array(5_000_000);
+                    const ulStart = Date.now();
+                    await fetch('https://speed.cloudflare.com/__up', {
+                        method: 'POST',
+                        body: uploadData,
+                        headers: { 'Content-Type': 'application/octet-stream' }
+                    }).catch(() => {});
+                    const ulTime = (Date.now() - ulStart) / 1000;
+                    const ulMbps = ((uploadData.byteLength * 8) / ulTime / 1_000_000).toFixed(2);
+
+                    const reply = `🌐 *Resultado del Speedtest:*\n\n` +
+                        `📥 *Descarga:* ${dlMbps} Mbit/s\n` +
+                        `📤 *Subida:* ${ulMbps} Mbit/s\n` +
+                        `📡 *Ping:* ${pingMs} ms\n` +
+                        `📍 *Servidor:* Cloudflare CDN`;
                     await ctx.reply(reply, { reply_to_message_id: messageId, parse_mode: 'Markdown' });
-                    return;
+                } catch (stErr: any) {
+                    await ctx.reply(`❌ Error en speedtest: ${stErr.message}`, { reply_to_message_id: messageId });
                 }
+                return;
             }
+
             // ── End speedtest shortcut ──
 
             // Pass the text to the agent loop
